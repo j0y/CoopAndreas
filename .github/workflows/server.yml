@@ -1,0 +1,27 @@
+on:
+  push:
+    paths:
+    - 'server/**'
+  pull_request:
+    paths: 
+    - 'server/**'
+
+name: server
+
+jobs:
+  cmake-build:
+    name: Make ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"] # "windows-latest", "macos-latest"
+    steps:
+    - uses: actions/checkout@v3
+      working-directory: ./server/build
+
+    - name: Configure
+      run: cmake -S .. -B .
+
+    - name: Build
+      run: make
