@@ -40,7 +40,7 @@ func New() *Server {
 	}
 }
 
-// HandlePacket implements network.PacketHandler interface
+// HandlePacket implements network.GameServer interface
 func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPacket) error {
 	switch packet.ID {
 	case types.CHECK_VERSION:

@@ -90,39 +90,27 @@ func UnmarshalPacket(data []byte) (*NetworkPacket, error) {
 	}, nil
 }
 
-// PacketHandler interface for handling different packet types
-type PacketHandler interface {
+// GameServer represents the game server that handles packets
+type GameServer interface {
 	HandlePacket(client *Client, packet *NetworkPacket) error
 	HandlePlayerConnect(client *Client)
 	HandlePlayerDisconnect(client *Client)
 }
 
-// NetworkServer interface that both UDP and ENet servers implement
-type NetworkServer interface {
-	Start() error
-	Stop()
-	IsRunning() bool
-	SendPacket(client *Client, packet *NetworkPacket) error
-	BroadcastPacket(packet *NetworkPacket)
-	BroadcastPacketExclude(packet *NetworkPacket, excludeClient *Client)
-	SendPacketToAll(packet *NetworkPacket, excludeClient *Client) error
-	GetClientCount() int
-}
-
 // Server represents the ENet-compatible server (replaces old UDP server)
 type Server struct {
-	host          enet.Host
-	clients       map[uint32]*Client
-	clientsMutex  sync.RWMutex
-	packetHandler PacketHandler
-	running       bool
-	runningMutex  sync.RWMutex
-	logger        zerolog.Logger
-	nextClientID  uint32
+	host         enet.Host
+	clients      map[uint32]*Client
+	clientsMutex sync.RWMutex
+	gameServer   GameServer
+	running      bool
+	runningMutex sync.RWMutex
+	logger       zerolog.Logger
+	nextClientID uint32
 }
 
 // NewServer creates a new ENet-compatible server
-func NewServer(port int, handler PacketHandler) *Server {
+func NewServer(port int, gameServer GameServer) *Server {
 	// Configure zerolog for pretty console output
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05"}).
 		With().
@@ -131,10 +119,10 @@ func NewServer(port int, handler PacketHandler) *Server {
 		Logger()
 
 	return &Server{
-		clients:       make(map[uint32]*Client),
-		packetHandler: handler,
-		logger:        logger,
-		nextClientID:  1,
+		clients:      make(map[uint32]*Client),
+		gameServer:   gameServer,
+		logger:       logger,
+		nextClientID: 1,
 	}
 }
 
@@ -245,7 +233,7 @@ func (s *Server) handleConnect(event enet.Event) {
 		Msg("ENet client connected")
 
 	// Call the connection handler
-	s.packetHandler.HandlePlayerConnect(client)
+	s.gameServer.HandlePlayerConnect(client)
 }
 
 // handleDisconnect handles peer disconnections
@@ -273,7 +261,7 @@ func (s *Server) handleDisconnect(event enet.Event) {
 			Msg("ENet client disconnected")
 
 		// Call the disconnection handler
-		s.packetHandler.HandlePlayerDisconnect(client)
+		s.gameServer.HandlePlayerDisconnect(client)
 	}
 
 	// Clear peer data
@@ -319,7 +307,7 @@ func (s *Server) handleReceive(event enet.Event) {
 		Msg("Received ENet packet")
 
 	// Handle the packet
-	if err := s.packetHandler.HandlePacket(client, gamePacket); err != nil {
+	if err := s.gameServer.HandlePacket(client, gamePacket); err != nil {
 		s.logger.Error().
 			Err(err).
 			Uint16("packetID", uint16(gamePacket.ID)).
