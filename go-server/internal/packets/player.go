@@ -7,6 +7,21 @@ import (
 	"coopandreas-server/internal/types"
 )
 
+// CCompressedControllerState represents compressed controller state from C++
+// This structure must match the C++ CCompressedControllerState exactly for binary compatibility
+type CCompressedControllerState struct {
+	LeftStickX int16 // move/steer left (-128)/right (+128)
+	LeftStickY int16 // move back(+128)/forwards(-128)
+
+	// Button and flag states packed into a 32-bit field
+	// This matches the C++ union structure with bitfields
+	Compressed uint32 // All button states as single value
+
+	// Disable flags packed into a 16-bit field
+	// This matches the C++ union structure with bitfields
+	DisableFlags uint16 // All disable flags as single value
+}
+
 // PlayerConnectedPacket represents a notification that a player has connected
 // This is sent from server to clients to notify about new player connections
 type PlayerConnectedPacket struct {
@@ -142,6 +157,26 @@ func (p *PlayerOnFootPacket) Unmarshal(data []byte) error {
 	return binary.Read(buf, binary.LittleEndian, p)
 }
 
+// PlayerKeySyncPacket represents a packet for synchronizing player controller state
+// This matches the C++ CPackets::PlayerKeySync structure exactly
+type PlayerKeySyncPacket struct {
+	ID       types.PlayerID             // Player ID (matches C++ int playerid)
+	NewState CCompressedControllerState // Compressed controller state
+}
+
+// Marshal serializes the packet to binary format
+func (p *PlayerKeySyncPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PlayerKeySyncPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
 // NewPlayerConnectedPacket creates a new player connected notification
 func NewPlayerConnectedPacket(playerID types.PlayerID, isAlreadyConnected bool) *PlayerConnectedPacket {
 	packet := &PlayerConnectedPacket{
@@ -209,4 +244,12 @@ func NewPlayerOnFootPacket(playerID types.PlayerID, position, velocity types.Vec
 	}
 
 	return packet
+}
+
+// NewPlayerKeySyncPacket creates a new player key synchronization packet
+func NewPlayerKeySyncPacket(playerID types.PlayerID, newState CCompressedControllerState) *PlayerKeySyncPacket {
+	return &PlayerKeySyncPacket{
+		ID:       playerID,
+		NewState: newState,
+	}
 }

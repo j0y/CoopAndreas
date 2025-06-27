@@ -55,6 +55,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handlePedRemove(client, packet.Data)
 	case types.PED_ONFOOT:
 		return s.handlePedOnFoot(client, packet.Data)
+	case types.PLAYER_KEY_SYNC:
+		return s.handlePlayerKeySync(client, packet.Data)
 	case types.MASS_PACKET_SEQUENCE:
 		return s.handleMassPacketSequence(client, packet.Data)
 	default:
@@ -701,6 +703,51 @@ func (s *Server) handlePlayerOnFoot(client *network.Client, data []byte) error {
 		Uint8("health", packet.Health).
 		Uint8("weapon", packet.Weapon).
 		Msg("Player onfoot update")
+
+	return nil
+}
+
+// handlePlayerKeySync handles PLAYER_KEY_SYNC packets
+func (s *Server) handlePlayerKeySync(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.Addr.String())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.Addr)
+	}
+
+	// Parse the packet
+	var packet packets.PlayerKeySyncPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PlayerKeySync packet: %w", err)
+	}
+
+	// Set the player ID (clients send 0, server assigns the actual ID)
+	// This matches the C++ logic: packet->playerid = CPlayerManager::GetPlayer(peer)->m_iPlayerId;
+	packet.ID = player.ID
+
+	// Broadcast to all other clients (unreliable packet, high frequency like onfoot)
+	// This matches the C++ logic: CNetwork::SendPacketToAll(CPacketsID::PLAYER_KEY_SYNC, packet, sizeof * packet, (ENetPacketFlag)0, peer);
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal player key sync packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PLAYER_KEY_SYNC,
+		Data: packetData,
+		Flag: 0, // Unreliable for frequent key updates (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast player key sync: %w", err)
+	}
+
+	s.logger.Debug().
+		Str("player", player.Name).
+		Uint32("compressed", packet.NewState.Compressed).
+		Int16("leftX", packet.NewState.LeftStickX).
+		Int16("leftY", packet.NewState.LeftStickY).
+		Msg("Player key sync update")
 
 	return nil
 }
