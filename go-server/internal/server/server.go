@@ -47,6 +47,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleCheckVersion(client, packet.Data)
 	case types.PLAYER_GET_NAME:
 		return s.handlePlayerGetName(client, packet.Data)
+	case types.PLAYER_ONFOOT:
+		return s.handlePlayerOnFoot(client, packet.Data)
 	case types.PED_SPAWN:
 		return s.handlePedSpawn(client, packet.Data)
 	case types.PED_REMOVE:
@@ -602,6 +604,73 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 
 	// TODO: Trigger GameWeatherTime like in C++ (CPacketHandler::GameWeatherTime__Trigger)
 	// This would send current weather/time state to the newly named player
+
+	return nil
+}
+
+// handlePlayerOnFoot handles PLAYER_ONFOOT packets
+// This method processes player movement and state updates from clients
+// Based on C++ CPlayerPackets::PlayerOnFoot::Handle implementation
+func (s *Server) handlePlayerOnFoot(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.Addr.String())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.Addr)
+	}
+
+	// Parse the packet
+	var packet packets.PlayerOnFootPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PlayerOnFoot packet: %w", err)
+	}
+
+	// Set the player ID (clients send 0, server assigns the actual ID)
+	packet.ID = player.ID
+
+	// Validate weapon (matching C++ logic: 0-18 or 22-46 are valid)
+	isValidWeapon := (packet.Weapon >= 0 && packet.Weapon <= 18) || (packet.Weapon >= 22 && packet.Weapon <= 46)
+	if !isValidWeapon {
+		packet.Weapon = 0
+		packet.Ammo = 0
+	}
+
+	// Validate fighting style (matching C++ logic: 4-16 are valid)
+	if packet.FightingStyle < 4 || packet.FightingStyle > 16 {
+		packet.FightingStyle = 4
+	}
+
+	// Validate velocity to prevent speed hacking (matching C++ logic: max 10.0 per axis)
+	if packet.Velocity.X > 10.0 || packet.Velocity.Y > 10.0 || packet.Velocity.Z > 10.0 {
+		packet.Velocity = types.Vector3{X: 0.0, Y: 0.0, Z: 0.0}
+	}
+
+	// TODO: Remove player from vehicle if they're in one (when vehicle system is implemented)
+	// In C++: if (player->m_nVehicleId >= 0) { player->RemoveFromVehicle(); }
+
+	// Broadcast to all other clients (unreliable packet, high frequency)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal player onfoot packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PLAYER_ONFOOT,
+		Data: packetData,
+		Flag: 0, // Unreliable for frequent position updates (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast player onfoot: %w", err)
+	}
+
+	s.logger.Debug().
+		Str("player", player.Name).
+		Float32("x", packet.Position.X).
+		Float32("y", packet.Position.Y).
+		Float32("z", packet.Position.Z).
+		Uint8("health", packet.Health).
+		Uint8("weapon", packet.Weapon).
+		Msg("Player onfoot update")
 
 	return nil
 }

@@ -113,6 +113,35 @@ func (p *PlayerGetNamePacket) SetNameString(name string) {
 	// Null terminator is already there from clearing
 }
 
+// PlayerOnFootPacket represents a player's on-foot movement and state
+// This matches the C++ CPackets::PlayerOnFoot structure exactly
+type PlayerOnFootPacket struct {
+	ID            types.PlayerID // Player ID
+	Position      types.Vector3  // Player position
+	Velocity      types.Vector3  // Player velocity/movement speed
+	Rotation      float32        // Player facing angle
+	Health        uint8          // Player health (0-100)
+	Armour        uint8          // Player armour (0-100)
+	Weapon        uint8          // Current weapon ID
+	Ammo          uint16         // Current ammo count
+	Ducking       uint8          // 1 if ducking, 0 if not (bool as uint8 for C++ compatibility)
+	HasJetpack    uint8          // 1 if has jetpack, 0 if not (bool as uint8 for C++ compatibility)
+	FightingStyle int8           // Fighting style (4-16)
+}
+
+// Marshal serializes the packet to binary format
+func (p *PlayerOnFootPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PlayerOnFootPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
 // NewPlayerConnectedPacket creates a new player connected notification
 func NewPlayerConnectedPacket(playerID types.PlayerID, isAlreadyConnected bool) *PlayerConnectedPacket {
 	packet := &PlayerConnectedPacket{
@@ -149,5 +178,35 @@ func NewPlayerGetNamePacket(playerID types.PlayerID, name string) *PlayerGetName
 		PlayerID: playerID,
 	}
 	packet.SetNameString(name)
+	return packet
+}
+
+// NewPlayerOnFootPacket creates a new player on-foot packet
+func NewPlayerOnFootPacket(playerID types.PlayerID, position, velocity types.Vector3, rotation float32, health, armour, weapon uint8, ammo uint16, ducking, hasJetpack bool, fightingStyle int8) *PlayerOnFootPacket {
+	packet := &PlayerOnFootPacket{
+		ID:            playerID,
+		Position:      position,
+		Velocity:      velocity,
+		Rotation:      rotation,
+		Health:        health,
+		Armour:        armour,
+		Weapon:        weapon,
+		Ammo:          ammo,
+		FightingStyle: fightingStyle,
+	}
+
+	// Convert booleans to uint8 for C++ compatibility
+	if ducking {
+		packet.Ducking = 1
+	} else {
+		packet.Ducking = 0
+	}
+
+	if hasJetpack {
+		packet.HasJetpack = 1
+	} else {
+		packet.HasJetpack = 0
+	}
+
 	return packet
 }
