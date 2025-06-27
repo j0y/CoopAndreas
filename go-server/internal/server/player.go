@@ -124,6 +124,12 @@ func (s *Server) handlePlayerOnFoot(client *network.Client, data []byte) error {
 
 // handlePlayerKeySync handles PLAYER_KEY_SYNC packets
 func (s *Server) handlePlayerKeySync(client *network.Client, data []byte) error {
+	// Debug packet size for troubleshooting
+	s.logger.Debug().
+		Int("dataSize", len(data)).
+		Str("dataHex", fmt.Sprintf("%x", data)).
+		Msg("Received PLAYER_KEY_SYNC packet")
+
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
@@ -133,6 +139,12 @@ func (s *Server) handlePlayerKeySync(client *network.Client, data []byte) error 
 	// Parse the packet
 	var packet packets.PlayerKeySyncPacket
 	if err := packet.Unmarshal(data); err != nil {
+		s.logger.Error().
+			Err(err).
+			Int("dataSize", len(data)).
+			Str("dataHex", fmt.Sprintf("%x", data)).
+			Str("client", client.Addr.String()).
+			Msg("Failed to unmarshal PLAYER_KEY_SYNC packet")
 		return fmt.Errorf("failed to unmarshal PlayerKeySync packet: %w", err)
 	}
 
