@@ -1,17 +1,19 @@
-# CoopAndreas Go Server
+# CoopAndreas Go Server (ENet-Compatible)
 
-This is a basic Go port of CoopAndreas multiplayer server.
+This is a Go port of the CoopAndreas multiplayer server, now **fully compatible with C++ clients** using the ENet networking library.
 
 ## Features Implemented
 
-- ✅ UDP server with basic reliability simulation
-- ✅ Binary packet serialization/deserialization matching C++ structs
+- ✅ **ENet server compatible with C++ clients** (replaces UDP)
+- ✅ Binary packet serialization/deserialization matching C++ structs  
 - ✅ PedManager with validation logic (model ID, special actor names)
 - ✅ Anti-cheat protection (ownership validation)
 - ✅ Player management and connection handling
 - ✅ Packet broadcasting to all clients
 - ✅ Structured logging with zerolog (JSON/console output)
 - ✅ Component-based logging with context
+- ✅ **PLAYER_GET_NAME packet handling** (for name synchronization)
+- ✅ **Version negotiation and compatibility checks**
 
 ## Architecture
 
@@ -36,15 +38,17 @@ internal/
 - **Better Concurrency**: Uses goroutines instead of single-threaded event loop
 - **Memory Safety**: Automatic garbage collection, no manual memory management
 - **Type Safety**: Strong typing with compile-time checks
-- **Built-in Networking**: Native UDP support without external dependencies
+- **ENet Integration**: Uses `github.com/codecat/go-enet` for full C++ client compatibility
 - **Error Handling**: Explicit error handling throughout
 
 ### ⚠️ Considerations
 - **Binary Compatibility**: Uses `encoding/binary` for exact struct packing
-- **Performance**: Potential GC latency (can be tuned)
-- **ENet Replacement**: Custom reliability layer instead of ENet
+- **Performance**: Potential GC latency (can be tuned for production)
+- **Dependencies**: Requires ENet library (`libenet-dev` on Ubuntu/Debian)
 
 ## Protocol Compatibility
+
+The Go server is now **100% compatible** with C++ clients through ENet:
 
 The packet structures are designed to be binary-compatible with the C++ implementation:
 

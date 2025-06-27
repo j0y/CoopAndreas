@@ -1,3 +1,5 @@
+github.com/codecat/go-enet v0.0.0-20250227075345-1c03ac96b7b4 h1:mrBQqFFf4koapCbVgIjXHv7WPNNykXjrbwyf7c/X8LI=
+github.com/codecat/go-enet v0.0.0-20250227075345-1c03ac96b7b4/go.mod h1:sXkhNvv8T1d/aPEwipUzk7rGWwGJ3uJST2P/Z0zE0L4=
 github.com/coreos/go-systemd/v22 v22.5.0/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
 github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=

@@ -1,7 +1,6 @@
 package network
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -9,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/codecat/go-enet"
 	"github.com/rs/zerolog"
 
 	"coopandreas-server/internal/types"
@@ -35,6 +35,8 @@ type Client struct {
 	Unreliable chan []byte // Channel for unreliable packets
 	Connected  bool
 	mutex      sync.RWMutex
+	// ENet support (required for ENet clients)
+	ENetPeer interface{} // Holds enet.Peer for ENet clients
 }
 
 // NewClient creates a new client instance
@@ -48,27 +50,18 @@ func NewClient(addr *net.UDPAddr) *Client {
 	}
 }
 
-// UpdateLastSeen updates the client's last seen timestamp
+// UpdateLastSeen updates the client's last seen time
 func (c *Client) UpdateLastSeen() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.LastSeen = time.Now()
 }
 
-// IsConnected checks if the client is still connected
-func (c *Client) IsConnected() bool {
+// IsTimedOut returns true if the client has timed out
+func (c *Client) IsTimedOut() bool {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	return c.Connected && time.Since(c.LastSeen) < ServerTimeout
-}
-
-// Disconnect marks the client as disconnected
-func (c *Client) Disconnect() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	c.Connected = false
-	close(c.Reliable)
-	close(c.Unreliable)
+	return time.Since(c.LastSeen) > ServerTimeout
 }
 
 // NetworkPacket represents a network packet
@@ -78,58 +71,23 @@ type NetworkPacket struct {
 	Flag PacketFlag
 }
 
-// Marshal serializes the packet for network transmission
-func (p *NetworkPacket) Marshal() ([]byte, error) {
-	buf := new(bytes.Buffer)
-
-	// Write packet ID (2 bytes)
-	if err := binary.Write(buf, binary.LittleEndian, uint16(p.ID)); err != nil {
-		return nil, err
-	}
-
-	// Write packet data
-	if _, err := buf.Write(p.Data); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-// UnmarshalPacket deserializes a network packet
+// UnmarshalPacket unmarshals a packet from raw bytes (C++ format)
 func UnmarshalPacket(data []byte) (*NetworkPacket, error) {
 	if len(data) < 2 {
 		return nil, fmt.Errorf("packet too short: %d bytes", len(data))
 	}
 
-	buf := bytes.NewReader(data)
-
-	// Read packet ID (2 bytes)
-	var id uint16
-	if err := binary.Read(buf, binary.LittleEndian, &id); err != nil {
-		return nil, err
-	}
+	// Read packet ID (2 bytes, little endian)
+	id := uint16(data[0]) | (uint16(data[1]) << 8)
 
 	// Read remaining data
 	packetData := make([]byte, len(data)-2)
-	if _, err := buf.Read(packetData); err != nil {
-		return nil, err
-	}
+	copy(packetData, data[2:])
 
 	return &NetworkPacket{
 		ID:   types.PacketID(id),
 		Data: packetData,
 	}, nil
-}
-
-// Server represents the UDP server
-type Server struct {
-	conn          *net.UDPConn
-	clients       map[string]*Client
-	clientsMutex  sync.RWMutex
-	packetHandler PacketHandler
-	running       bool
-	runningMutex  sync.RWMutex
-	logger        zerolog.Logger
 }
 
 // PacketHandler interface for handling different packet types
@@ -139,239 +97,317 @@ type PacketHandler interface {
 	HandlePlayerDisconnect(client *Client)
 }
 
-// NewServer creates a new UDP server
+// NetworkServer interface that both UDP and ENet servers implement
+type NetworkServer interface {
+	Start() error
+	Stop()
+	IsRunning() bool
+	SendPacket(client *Client, packet *NetworkPacket) error
+	BroadcastPacket(packet *NetworkPacket)
+	BroadcastPacketExclude(packet *NetworkPacket, excludeClient *Client)
+	SendPacketToAll(packet *NetworkPacket, excludeClient *Client) error
+	GetClientCount() int
+}
+
+// Server represents the ENet-compatible server (replaces old UDP server)
+type Server struct {
+	host          enet.Host
+	clients       map[uint32]*Client
+	clientsMutex  sync.RWMutex
+	packetHandler PacketHandler
+	running       bool
+	runningMutex  sync.RWMutex
+	logger        zerolog.Logger
+	nextClientID  uint32
+}
+
+// NewServer creates a new ENet-compatible server
 func NewServer(port int, handler PacketHandler) *Server {
 	// Configure zerolog for pretty console output
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05"}).
 		With().
 		Timestamp().
-		Str("component", "network").
+		Str("component", "enet").
 		Logger()
 
 	return &Server{
-		clients:       make(map[string]*Client),
+		clients:       make(map[uint32]*Client),
 		packetHandler: handler,
 		logger:        logger,
+		nextClientID:  1,
 	}
 }
 
-// Start starts the UDP server
+// Start starts the ENet server
 func (s *Server) Start() error {
-	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", 6767))
+	s.runningMutex.Lock()
+	defer s.runningMutex.Unlock()
+
+	if s.running {
+		return fmt.Errorf("server is already running")
+	}
+
+	// Initialize ENet
+	enet.Initialize()
+
+	// Create listen address
+	addr := enet.NewListenAddress(uint16(6767))
+
+	// Create ENet host
+	host, err := enet.NewHost(addr, 32, 2, 0, 0) // 32 peers, 2 channels, no bandwidth limits
 	if err != nil {
-		return fmt.Errorf("failed to resolve address: %w", err)
+		enet.Deinitialize()
+		return fmt.Errorf("failed to create ENet host: %w", err)
 	}
 
-	conn, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		return fmt.Errorf("failed to listen on UDP: %w", err)
-	}
+	s.host = host
+	s.running = true
 
-	s.conn = conn
-	s.setRunning(true)
+	s.logger.Info().Int("port", 6767).Msg("ENet server started - compatible with C++ clients")
 
-	s.logger.Info().Str("address", addr.String()).Msg("Server listening")
-
-	// Start cleanup goroutine
-	go s.cleanupLoop()
-
-	// Main packet receiving loop
-	buffer := make([]byte, MaxPacketSize)
-	for s.isRunning() {
-		conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-		n, clientAddr, err := conn.ReadFromUDP(buffer)
-		if err != nil {
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				continue // Timeout is expected for graceful shutdown
-			}
-			if s.isRunning() {
-				s.logger.Error().Err(err).Msg("Error reading UDP packet")
-			}
-			continue
-		}
-
-		// Handle packet in goroutine
-		go s.handlePacket(clientAddr, buffer[:n])
-	}
+	// Start the main server loop
+	go s.run()
 
 	return nil
 }
 
-// Stop stops the server
+// Stop stops the ENet server
 func (s *Server) Stop() {
-	s.setRunning(false)
+	s.runningMutex.Lock()
+	defer s.runningMutex.Unlock()
 
-	if s.conn != nil {
-		s.conn.Close()
-	}
-
-	// Disconnect all clients
-	s.clientsMutex.Lock()
-	for _, client := range s.clients {
-		client.Disconnect()
-	}
-	s.clients = make(map[string]*Client)
-	s.clientsMutex.Unlock()
-}
-
-// handlePacket processes incoming packets
-func (s *Server) handlePacket(clientAddr *net.UDPAddr, data []byte) {
-	client := s.getOrCreateClient(clientAddr)
-	client.UpdateLastSeen()
-
-	packet, err := UnmarshalPacket(data)
-	if err != nil {
-		s.logger.Error().Err(err).Str("client", clientAddr.String()).Msg("Failed to unmarshal packet")
+	if !s.running {
 		return
 	}
 
-	s.logger.Debug().
-		Uint16("packetID", uint16(packet.ID)).
-		Str("client", clientAddr.String()).
-		Msg("Received packet")
+	s.running = false
 
-	// Handle the packet
-	if err := s.packetHandler.HandlePacket(client, packet); err != nil {
-		s.logger.Error().
-			Err(err).
-			Uint16("packetID", uint16(packet.ID)).
-			Str("client", clientAddr.String()).
-			Msg("Error handling packet")
+	if s.host != nil {
+		s.host.Destroy()
 	}
+	enet.Deinitialize()
+
+	s.logger.Info().Msg("ENet server stopped")
 }
 
-// getOrCreateClient gets or creates a client for the given address
-func (s *Server) getOrCreateClient(addr *net.UDPAddr) *Client {
-	addrStr := addr.String()
-
-	s.clientsMutex.RLock()
-	if client, exists := s.clients[addrStr]; exists {
-		s.clientsMutex.RUnlock()
-		return client
-	}
-	s.clientsMutex.RUnlock()
-
-	// Create new client
-	s.clientsMutex.Lock()
-	defer s.clientsMutex.Unlock()
-
-	// Double-check in case another goroutine created it
-	if client, exists := s.clients[addrStr]; exists {
-		return client
-	}
-
-	client := NewClient(addr)
-	s.clients[addrStr] = client
-	s.logger.Info().Str("client", addr.String()).Msg("New client connected")
-
-	// Call the connection handler (like C++ HandlePlayerConnected)
-	s.packetHandler.HandlePlayerConnect(client)
-
-	return client
-}
-
-// SendPacket sends a packet to a specific client
-func (s *Server) SendPacket(client *Client, packet *NetworkPacket) error {
-	data, err := packet.Marshal()
-	if err != nil {
-		return fmt.Errorf("failed to marshal packet: %w", err)
-	}
-
-	_, err = s.conn.WriteToUDP(data, client.Addr)
-	if err != nil {
-		return fmt.Errorf("failed to send packet: %w", err)
-	}
-
-	s.logger.Debug().
-		Uint16("packetID", uint16(packet.ID)).
-		Str("client", client.Addr.String()).
-		Msg("Sent packet")
-	return nil
-}
-
-// SendPacketToAll sends a packet to all connected clients except the excluded one
-func (s *Server) SendPacketToAll(packet *NetworkPacket, exclude *Client) error {
-	data, err := packet.Marshal()
-	if err != nil {
-		return fmt.Errorf("failed to marshal packet: %w", err)
-	}
-
-	s.clientsMutex.RLock()
-	defer s.clientsMutex.RUnlock()
-
-	for _, client := range s.clients {
-		if exclude != nil && client == exclude {
-			continue
-		}
-
-		if !client.IsConnected() {
-			continue
-		}
-
-		if _, err := s.conn.WriteToUDP(data, client.Addr); err != nil {
-			s.logger.Error().Err(err).Str("client", client.Addr.String()).Msg("Failed to send packet")
-		}
-	}
-
-	s.logger.Debug().
-		Uint16("packetID", uint16(packet.ID)).
-		Int("clientCount", len(s.clients)).
-		Msg("Broadcast packet to all clients")
-	return nil
-}
-
-// cleanupLoop removes disconnected clients
-func (s *Server) cleanupLoop() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	for s.isRunning() {
-		<-ticker.C
-		s.cleanupClients()
-	}
-}
-
-// cleanupClients removes disconnected clients
-func (s *Server) cleanupClients() {
-	s.clientsMutex.Lock()
-	defer s.clientsMutex.Unlock()
-
-	for addr, client := range s.clients {
-		if !client.IsConnected() {
-			// Call the disconnection handler (like C++ HandlePlayerDisconnected)
-			s.packetHandler.HandlePlayerDisconnect(client)
-
-			client.Disconnect()
-			delete(s.clients, addr)
-			s.logger.Info().Str("client", addr).Msg("Cleaned up disconnected client")
-		}
-	}
-}
-
-// isRunning checks if the server is running
-func (s *Server) isRunning() bool {
+// IsRunning returns true if the server is running
+func (s *Server) IsRunning() bool {
 	s.runningMutex.RLock()
 	defer s.runningMutex.RUnlock()
 	return s.running
 }
 
-// setRunning sets the running state
-func (s *Server) setRunning(running bool) {
-	s.runningMutex.Lock()
-	defer s.runningMutex.Unlock()
-	s.running = running
+// run is the main server loop
+func (s *Server) run() {
+	for s.IsRunning() {
+		event := s.host.Service(100) // 100ms timeout
+		if event == nil {
+			continue
+		}
+
+		switch event.GetType() {
+		case enet.EventConnect:
+			s.handleConnect(event)
+		case enet.EventDisconnect:
+			s.handleDisconnect(event)
+		case enet.EventReceive:
+			s.handleReceive(event)
+		}
+	}
 }
 
-// GetClients returns all connected clients
-func (s *Server) GetClients() []*Client {
+// handleConnect handles new peer connections
+func (s *Server) handleConnect(event enet.Event) {
+	peer := event.GetPeer()
+	clientID := s.nextClientID
+	s.nextClientID++
+
+	// Convert ENet address to UDP address for compatibility
+	udpAddr := &net.UDPAddr{
+		IP:   net.ParseIP("127.0.0.1"), // Placeholder - ENet doesn't expose actual client IP easily
+		Port: 0,                        // ENet doesn't expose the client port directly
+	}
+
+	client := NewClient(udpAddr)
+	client.ENetPeer = peer // Store the ENet peer for sending packets
+
+	s.clientsMutex.Lock()
+	s.clients[clientID] = client
+	s.clientsMutex.Unlock()
+
+	// Store client ID in peer data (as bytes)
+	clientIDBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(clientIDBytes, clientID)
+	peer.SetData(clientIDBytes)
+
+	s.logger.Info().
+		Uint32("clientID", clientID).
+		Msg("ENet client connected")
+
+	// Call the connection handler
+	s.packetHandler.HandlePlayerConnect(client)
+}
+
+// handleDisconnect handles peer disconnections
+func (s *Server) handleDisconnect(event enet.Event) {
+	peer := event.GetPeer()
+	clientIDBytes := peer.GetData()
+
+	if len(clientIDBytes) < 4 {
+		s.logger.Warn().Msg("Invalid client ID data on disconnect")
+		return
+	}
+
+	clientID := binary.LittleEndian.Uint32(clientIDBytes)
+
+	s.clientsMutex.Lock()
+	client, exists := s.clients[clientID]
+	if exists {
+		delete(s.clients, clientID)
+	}
+	s.clientsMutex.Unlock()
+
+	if exists {
+		s.logger.Info().
+			Uint32("clientID", clientID).
+			Msg("ENet client disconnected")
+
+		// Call the disconnection handler
+		s.packetHandler.HandlePlayerDisconnect(client)
+	}
+
+	// Clear peer data
+	peer.SetData(nil)
+}
+
+// handleReceive handles received packets
+func (s *Server) handleReceive(event enet.Event) {
+	peer := event.GetPeer()
+	clientIDBytes := peer.GetData()
+
+	if len(clientIDBytes) < 4 {
+		s.logger.Warn().Msg("Invalid client ID data on receive")
+		return
+	}
+
+	clientID := binary.LittleEndian.Uint32(clientIDBytes)
+
+	s.clientsMutex.RLock()
+	client, exists := s.clients[clientID]
+	s.clientsMutex.RUnlock()
+
+	if !exists {
+		s.logger.Warn().Uint32("clientID", clientID).Msg("Received packet from unknown client")
+		return
+	}
+
+	client.UpdateLastSeen()
+
+	packet := event.GetPacket()
+	data := packet.GetData()
+
+	gamePacket, err := UnmarshalPacket(data)
+	if err != nil {
+		s.logger.Error().Err(err).Uint32("clientID", clientID).Msg("Failed to unmarshal game packet")
+		packet.Destroy()
+		return
+	}
+
+	s.logger.Debug().
+		Uint16("packetID", uint16(gamePacket.ID)).
+		Uint32("clientID", clientID).
+		Msg("Received ENet packet")
+
+	// Handle the packet
+	if err := s.packetHandler.HandlePacket(client, gamePacket); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint16("packetID", uint16(gamePacket.ID)).
+			Uint32("clientID", clientID).
+			Msg("Error handling packet")
+	}
+
+	// Destroy the packet
+	packet.Destroy()
+}
+
+// SendPacket sends a packet to a specific client (ENet version)
+func (s *Server) SendPacket(client *Client, packet *NetworkPacket) error {
+	if client.ENetPeer == nil {
+		return fmt.Errorf("client does not have an ENet peer")
+	}
+
+	// Cast the interface{} to enet.Peer
+	peer, ok := client.ENetPeer.(enet.Peer)
+	if !ok {
+		return fmt.Errorf("client ENetPeer is not an enet.Peer")
+	}
+
+	// Marshal the game packet (C++ format: 2-byte ID + data)
+	data := make([]byte, 2+len(packet.Data))
+	binary.LittleEndian.PutUint16(data[:2], uint16(packet.ID))
+	copy(data[2:], packet.Data)
+
+	// Create ENet packet
+	var flags enet.PacketFlags
+	if packet.Flag&PacketFlagReliable != 0 {
+		flags = enet.PacketFlagReliable
+	}
+
+	enetPacket, err := enet.NewPacket(data, flags)
+	if err != nil {
+		return fmt.Errorf("failed to create ENet packet: %w", err)
+	}
+
+	// Send packet
+	return peer.SendPacket(enetPacket, 0) // Channel 0
+}
+
+// BroadcastPacket sends a packet to all connected clients
+func (s *Server) BroadcastPacket(packet *NetworkPacket) {
 	s.clientsMutex.RLock()
 	defer s.clientsMutex.RUnlock()
 
-	clients := make([]*Client, 0, len(s.clients))
 	for _, client := range s.clients {
-		if client.IsConnected() {
-			clients = append(clients, client)
+		if err := s.SendPacket(client, packet); err != nil {
+			s.logger.Error().
+				Err(err).
+				Str("client", client.Addr.String()).
+				Msg("Failed to broadcast packet to client")
 		}
 	}
-	return clients
+}
+
+// BroadcastPacketExclude sends a packet to all connected clients except the excluded one
+func (s *Server) BroadcastPacketExclude(packet *NetworkPacket, excludeClient *Client) {
+	s.clientsMutex.RLock()
+	defer s.clientsMutex.RUnlock()
+
+	for _, client := range s.clients {
+		if client.Addr.String() != excludeClient.Addr.String() {
+			if err := s.SendPacket(client, packet); err != nil {
+				s.logger.Error().
+					Err(err).
+					Str("client", client.Addr.String()).
+					Msg("Failed to broadcast packet to client")
+			}
+		}
+	}
+}
+
+// SendPacketToAll sends a packet to all clients, optionally excluding one
+func (s *Server) SendPacketToAll(packet *NetworkPacket, excludeClient *Client) error {
+	if excludeClient == nil {
+		s.BroadcastPacket(packet)
+	} else {
+		s.BroadcastPacketExclude(packet, excludeClient)
+	}
+	return nil
+}
+
+// GetClientCount returns the number of connected clients
+func (s *Server) GetClientCount() int {
+	s.clientsMutex.RLock()
+	defer s.clientsMutex.RUnlock()
+	return len(s.clients)
 }

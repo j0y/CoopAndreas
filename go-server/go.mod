@@ -1,8 +1,13 @@
 module coopandreas-server
 
-go 1.21
+go 1.23
 
-require github.com/rs/zerolog v1.32.0
+toolchain go1.24.0
+
+require (
+	github.com/codecat/go-enet v0.0.0-20250227075345-1c03ac96b7b4
+	github.com/rs/zerolog v1.32.0
+)
 
 require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
