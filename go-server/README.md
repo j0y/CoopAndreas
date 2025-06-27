@@ -13,6 +13,7 @@ This is a Go port of the CoopAndreas multiplayer server, now **fully compatible 
 - ✅ Structured logging with zerolog (JSON/console output)
 - ✅ Component-based logging with context
 - ✅ **PLAYER_GET_NAME packet handling** (for name synchronization)
+- ✅ **PLAYER_DISCONNECTED packet handling** (for clean disconnection notification)
 - ✅ **Version negotiation and compatibility checks**
 
 ## Architecture

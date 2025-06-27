@@ -379,11 +379,19 @@ func (s *Server) HandlePlayerConnect(client *network.Client) {
 }
 
 // HandlePlayerDisconnect handles when a player disconnects
+// This method:
+// 1. Removes all peds owned by the disconnecting player
+// 2. Broadcasts PED_REMOVE packets for cleanup
+// 3. Removes the player from the player manager
+// 4. Broadcasts PLAYER_DISCONNECTED packet to all remaining clients (matching C++ behavior)
 func (s *Server) HandlePlayerDisconnect(client *network.Client) {
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return
 	}
+
+	// Store player ID for broadcasting
+	disconnectedPlayerID := player.ID
 
 	// Remove all peds owned by this player
 	removedPeds := s.pedManager.RemoveAllHostedBy(player)
@@ -404,9 +412,26 @@ func (s *Server) HandlePlayerDisconnect(client *network.Client) {
 		}
 	}
 
+	// Remove player from manager
 	s.playerManager.RemovePlayer(client.Addr.String())
+
+	// Create and broadcast PLAYER_DISCONNECTED packet to all remaining clients
+	disconnectPacket := packets.NewPlayerDisconnectedPacket(disconnectedPlayerID, 0) // Normal disconnect (no specific reason code)
+
+	if data, err := disconnectPacket.Marshal(); err == nil {
+		networkPacket := &network.NetworkPacket{
+			ID:   types.PLAYER_DISCONNECTED,
+			Data: data,
+			Flag: 0, // Use unreliable for disconnect notifications (matching C++ implementation)
+		}
+		s.networkServer.SendPacketToAll(networkPacket, nil) // Send to all clients (not excluding anyone since the client is already disconnected)
+	} else {
+		s.logger.Error().Err(err).Msg("Failed to marshal player disconnect packet")
+	}
+
 	s.logger.Info().
 		Str("player", player.Name).
+		Int32("playerID", int32(disconnectedPlayerID)).
 		Int("pedsRemoved", len(removedPeds)).
 		Msg("Player disconnected")
 }
