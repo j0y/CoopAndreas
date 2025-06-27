@@ -29,12 +29,12 @@ const (
 
 // Client represents a connected client
 type Client struct {
-	Addr         *net.UDPAddr
-	LastSeen     time.Time
-	Reliable     chan []byte // Channel for reliable packets
-	Unreliable   chan []byte // Channel for unreliable packets
-	Connected    bool
-	mutex        sync.RWMutex
+	Addr       *net.UDPAddr
+	LastSeen   time.Time
+	Reliable   chan []byte // Channel for reliable packets
+	Unreliable chan []byte // Channel for unreliable packets
+	Connected  bool
+	mutex      sync.RWMutex
 }
 
 // NewClient creates a new client instance
@@ -81,17 +81,17 @@ type NetworkPacket struct {
 // Marshal serializes the packet for network transmission
 func (p *NetworkPacket) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	
+
 	// Write packet ID (2 bytes)
 	if err := binary.Write(buf, binary.LittleEndian, uint16(p.ID)); err != nil {
 		return nil, err
 	}
-	
+
 	// Write packet data
 	if _, err := buf.Write(p.Data); err != nil {
 		return nil, err
 	}
-	
+
 	return buf.Bytes(), nil
 }
 
@@ -100,21 +100,21 @@ func UnmarshalPacket(data []byte) (*NetworkPacket, error) {
 	if len(data) < 2 {
 		return nil, fmt.Errorf("packet too short: %d bytes", len(data))
 	}
-	
+
 	buf := bytes.NewReader(data)
-	
+
 	// Read packet ID (2 bytes)
 	var id uint16
 	if err := binary.Read(buf, binary.LittleEndian, &id); err != nil {
 		return nil, err
 	}
-	
+
 	// Read remaining data
 	packetData := make([]byte, len(data)-2)
 	if _, err := buf.Read(packetData); err != nil {
 		return nil, err
 	}
-	
+
 	return &NetworkPacket{
 		ID:   types.PacketID(id),
 		Data: packetData,
@@ -135,6 +135,8 @@ type Server struct {
 // PacketHandler interface for handling different packet types
 type PacketHandler interface {
 	HandlePacket(client *Client, packet *NetworkPacket) error
+	HandlePlayerConnect(client *Client)
+	HandlePlayerDisconnect(client *Client)
 }
 
 // NewServer creates a new UDP server
@@ -145,7 +147,7 @@ func NewServer(port int, handler PacketHandler) *Server {
 		Timestamp().
 		Str("component", "network").
 		Logger()
-	
+
 	return &Server{
 		clients:       make(map[string]*Client),
 		packetHandler: handler,
@@ -159,20 +161,20 @@ func (s *Server) Start() error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve address: %w", err)
 	}
-	
+
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
 		return fmt.Errorf("failed to listen on UDP: %w", err)
 	}
-	
+
 	s.conn = conn
 	s.setRunning(true)
-	
+
 	s.logger.Info().Str("address", addr.String()).Msg("Server listening")
-	
+
 	// Start cleanup goroutine
 	go s.cleanupLoop()
-	
+
 	// Main packet receiving loop
 	buffer := make([]byte, MaxPacketSize)
 	for s.isRunning() {
@@ -187,22 +189,22 @@ func (s *Server) Start() error {
 			}
 			continue
 		}
-		
+
 		// Handle packet in goroutine
 		go s.handlePacket(clientAddr, buffer[:n])
 	}
-	
+
 	return nil
 }
 
 // Stop stops the server
 func (s *Server) Stop() {
 	s.setRunning(false)
-	
+
 	if s.conn != nil {
 		s.conn.Close()
 	}
-	
+
 	// Disconnect all clients
 	s.clientsMutex.Lock()
 	for _, client := range s.clients {
@@ -216,18 +218,18 @@ func (s *Server) Stop() {
 func (s *Server) handlePacket(clientAddr *net.UDPAddr, data []byte) {
 	client := s.getOrCreateClient(clientAddr)
 	client.UpdateLastSeen()
-	
+
 	packet, err := UnmarshalPacket(data)
 	if err != nil {
 		s.logger.Error().Err(err).Str("client", clientAddr.String()).Msg("Failed to unmarshal packet")
 		return
 	}
-	
+
 	s.logger.Debug().
 		Uint16("packetID", uint16(packet.ID)).
 		Str("client", clientAddr.String()).
 		Msg("Received packet")
-	
+
 	// Handle the packet
 	if err := s.packetHandler.HandlePacket(client, packet); err != nil {
 		s.logger.Error().
@@ -241,27 +243,30 @@ func (s *Server) handlePacket(clientAddr *net.UDPAddr, data []byte) {
 // getOrCreateClient gets or creates a client for the given address
 func (s *Server) getOrCreateClient(addr *net.UDPAddr) *Client {
 	addrStr := addr.String()
-	
+
 	s.clientsMutex.RLock()
 	if client, exists := s.clients[addrStr]; exists {
 		s.clientsMutex.RUnlock()
 		return client
 	}
 	s.clientsMutex.RUnlock()
-	
+
 	// Create new client
 	s.clientsMutex.Lock()
 	defer s.clientsMutex.Unlock()
-	
+
 	// Double-check in case another goroutine created it
 	if client, exists := s.clients[addrStr]; exists {
 		return client
 	}
-	
+
 	client := NewClient(addr)
 	s.clients[addrStr] = client
 	s.logger.Info().Str("client", addr.String()).Msg("New client connected")
-	
+
+	// Call the connection handler (like C++ HandlePlayerConnected)
+	s.packetHandler.HandlePlayerConnect(client)
+
 	return client
 }
 
@@ -271,12 +276,12 @@ func (s *Server) SendPacket(client *Client, packet *NetworkPacket) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal packet: %w", err)
 	}
-	
+
 	_, err = s.conn.WriteToUDP(data, client.Addr)
 	if err != nil {
 		return fmt.Errorf("failed to send packet: %w", err)
 	}
-	
+
 	s.logger.Debug().
 		Uint16("packetID", uint16(packet.ID)).
 		Str("client", client.Addr.String()).
@@ -290,24 +295,24 @@ func (s *Server) SendPacketToAll(packet *NetworkPacket, exclude *Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal packet: %w", err)
 	}
-	
+
 	s.clientsMutex.RLock()
 	defer s.clientsMutex.RUnlock()
-	
+
 	for _, client := range s.clients {
 		if exclude != nil && client == exclude {
 			continue
 		}
-		
+
 		if !client.IsConnected() {
 			continue
 		}
-		
+
 		if _, err := s.conn.WriteToUDP(data, client.Addr); err != nil {
 			s.logger.Error().Err(err).Str("client", client.Addr.String()).Msg("Failed to send packet")
 		}
 	}
-	
+
 	s.logger.Debug().
 		Uint16("packetID", uint16(packet.ID)).
 		Int("clientCount", len(s.clients)).
@@ -319,12 +324,10 @@ func (s *Server) SendPacketToAll(packet *NetworkPacket, exclude *Client) error {
 func (s *Server) cleanupLoop() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	
+
 	for s.isRunning() {
-		select {
-		case <-ticker.C:
-			s.cleanupClients()
-		}
+		<-ticker.C
+		s.cleanupClients()
 	}
 }
 
@@ -332,9 +335,12 @@ func (s *Server) cleanupLoop() {
 func (s *Server) cleanupClients() {
 	s.clientsMutex.Lock()
 	defer s.clientsMutex.Unlock()
-	
+
 	for addr, client := range s.clients {
 		if !client.IsConnected() {
+			// Call the disconnection handler (like C++ HandlePlayerDisconnected)
+			s.packetHandler.HandlePlayerDisconnect(client)
+
 			client.Disconnect()
 			delete(s.clients, addr)
 			s.logger.Info().Str("client", addr).Msg("Cleaned up disconnected client")
@@ -360,7 +366,7 @@ func (s *Server) setRunning(running bool) {
 func (s *Server) GetClients() []*Client {
 	s.clientsMutex.RLock()
 	defer s.clientsMutex.RUnlock()
-	
+
 	clients := make([]*Client, 0, len(s.clients))
 	for _, client := range s.clients {
 		if client.IsConnected() {

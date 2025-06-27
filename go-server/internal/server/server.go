@@ -31,7 +31,7 @@ func New() *Server {
 		Timestamp().
 		Str("component", "game").
 		Logger()
-	
+
 	return &Server{
 		playerManager:  entities.NewPlayerManager(),
 		pedManager:     entities.NewPedManager(),
@@ -89,7 +89,7 @@ func (s *Server) handleCheckVersion(client *network.Client, data []byte) error {
 			Str("client", client.Addr.String()).
 			Str("clientVersion", clientVersionStr).
 			Msg("Failed to validate client version")
-		
+
 		// Send incompatible response due to validation error
 		isCompatible = false
 		message = "Version validation failed"
@@ -169,11 +169,11 @@ func (s *Server) handlePedSpawn(client *network.Client, data []byte) error {
 	// Create ped entity
 	ped := &entities.Ped{
 		ID:               types.PedID(packet.PedID),
-		Syncer:          player,
-		ModelID:         packet.ModelID,
-		PedType:         packet.PedType,
-		Position:        packet.Position,
-		CreatedBy:       packet.CreatedBy,
+		Syncer:           player,
+		ModelID:          packet.ModelID,
+		PedType:          packet.PedType,
+		Position:         packet.Position,
+		CreatedBy:        packet.CreatedBy,
 		SpecialModelName: packet.SpecialModelName,
 	}
 
@@ -340,17 +340,40 @@ func (s *Server) SetNetworkServer(netServer *network.Server) {
 
 // HandlePlayerConnect handles when a player connects
 func (s *Server) HandlePlayerConnect(client *network.Client) {
-	// Create a new player (this would normally come from a handshake packet)
+	// Generate a unique player ID (similar to C++ GetFreeID())
+	playerID := s.generatePlayerID()
+
+	// Create a new player with default name
 	player := &entities.Player{
-		ID:   types.PlayerID(len(s.playerManager.GetAllPlayers()) + 1),
-		Name: fmt.Sprintf("Player_%s", strings.Replace(client.Addr.String(), ":", "_", -1)),
+		ID:       playerID,
+		Name:     fmt.Sprintf("Player_%d", int(playerID)),
+		PeerAddr: client.Addr.String(),
+		IsHost:   false,
 	}
 
 	s.playerManager.AddPlayer(client.Addr.String(), player)
 	s.logger.Info().
 		Str("player", player.Name).
 		Str("address", client.Addr.String()).
+		Int32("playerID", int32(playerID)).
 		Msg("Player connected")
+
+	// Send PlayerConnected packet to all existing players (excluding new player)
+	playerConnectedPacket := packets.NewPlayerConnectedPacket(player.ID, false)
+	s.broadcastPlayerConnectedPacket(playerConnectedPacket, client)
+
+	// Send existing players to the new player (with isAlreadyConnected = true)
+	s.sendExistingPlayersTo(client, player)
+
+	// Send existing vehicles to the new player
+	s.sendExistingVehiclesTo(client)
+
+	// Send existing peds to the new player
+	s.sendExistingPedsTo(client)
+
+	// Send handshake packet to the new player
+	handshakePacket := packets.NewPlayerHandshakePacket(player.ID)
+	s.sendHandshakeTo(client, handshakePacket)
 }
 
 // HandlePlayerDisconnect handles when a player disconnects
@@ -362,13 +385,13 @@ func (s *Server) HandlePlayerDisconnect(client *network.Client) {
 
 	// Remove all peds owned by this player
 	removedPeds := s.pedManager.RemoveAllHostedBy(player)
-	
+
 	// Broadcast ped removals
 	for _, pedID := range removedPeds {
 		removePacket := packets.PedRemovePacket{
 			PedID: int32(pedID),
 		}
-		
+
 		if data, err := removePacket.Marshal(); err == nil {
 			networkPacket := &network.NetworkPacket{
 				ID:   types.PED_REMOVE,
@@ -384,4 +407,127 @@ func (s *Server) HandlePlayerDisconnect(client *network.Client) {
 		Str("player", player.Name).
 		Int("pedsRemoved", len(removedPeds)).
 		Msg("Player disconnected")
+}
+
+// broadcastPlayerConnectedPacket sends a PlayerConnected packet to all players except the specified client
+func (s *Server) broadcastPlayerConnectedPacket(packet *packets.PlayerConnectedPacket, excludeClient *network.Client) {
+	// For now, we'll log the intent since we don't have a SendPacketToAll method yet
+	// TODO: Implement proper broadcasting to all clients except excludeClient
+	s.logger.Info().
+		Int32("playerID", int32(packet.ID)).
+		Bool("isAlreadyConnected", packet.IsAlreadyConnected == 1).
+		Msg("Broadcasting PlayerConnected packet to existing players")
+}
+
+// sendExistingPlayersTo sends information about all existing players to a new player
+func (s *Server) sendExistingPlayersTo(client *network.Client, newPlayer *entities.Player) {
+	allPlayers := s.playerManager.GetAllPlayers()
+
+	for _, existingPlayer := range allPlayers {
+		if existingPlayer.ID == newPlayer.ID {
+			continue // Skip the new player itself
+		}
+
+		// Send PlayerConnected packet with isAlreadyConnected = true
+		playerPacket := packets.NewPlayerConnectedPacket(existingPlayer.ID, true)
+		packetData, err := playerPacket.Marshal()
+		if err != nil {
+			s.logger.Error().Err(err).Msg("Failed to marshal existing player packet")
+			continue
+		}
+
+		networkPacket := &network.NetworkPacket{
+			ID:   types.PLAYER_CONNECTED,
+			Data: packetData,
+			Flag: network.PacketFlagReliable,
+		}
+
+		if err := s.networkServer.SendPacket(client, networkPacket); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to send existing player packet")
+		}
+
+		s.logger.Debug().
+			Int32("existingPlayerID", int32(existingPlayer.ID)).
+			Str("newPlayer", newPlayer.Name).
+			Msg("Sent existing player info to new player")
+	}
+}
+
+// sendExistingVehiclesTo sends information about all existing vehicles to a new player
+func (s *Server) sendExistingVehiclesTo(client *network.Client) {
+	// TODO: Implement when vehicle management is added
+	s.logger.Debug().
+		Str("client", client.Addr.String()).
+		Msg("Sending existing vehicles to new player (placeholder)")
+}
+
+// sendExistingPedsTo sends information about all existing peds to a new player
+func (s *Server) sendExistingPedsTo(client *network.Client) {
+	allPeds := s.pedManager.GetAllPeds()
+
+	for _, ped := range allPeds {
+		pedSpawnPacket := packets.PedSpawnPacket{
+			PedID:     int32(ped.ID),
+			TempID:    0, // Existing peds don't need temp ID
+			ModelID:   ped.ModelID,
+			PedType:   ped.PedType,
+			Position:  ped.Position,
+			CreatedBy: ped.CreatedBy,
+		}
+
+		// Copy special model name
+		copy(pedSpawnPacket.SpecialModelName[:], ped.SpecialModelName[:])
+
+		packetData, err := pedSpawnPacket.Marshal()
+		if err != nil {
+			s.logger.Error().Err(err).Msg("Failed to marshal existing ped packet")
+			continue
+		}
+
+		networkPacket := &network.NetworkPacket{
+			ID:   types.PED_SPAWN,
+			Data: packetData,
+			Flag: network.PacketFlagReliable,
+		}
+
+		if err := s.networkServer.SendPacket(client, networkPacket); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to send existing ped packet")
+		}
+
+		s.logger.Debug().
+			Int32("pedID", int32(ped.ID)).
+			Str("client", client.Addr.String()).
+			Msg("Sent existing ped info to new player")
+	}
+}
+
+// sendHandshakeTo sends a handshake packet to a new player
+func (s *Server) sendHandshakeTo(client *network.Client, handshakePacket *packets.PlayerHandshakePacket) {
+	packetData, err := handshakePacket.Marshal()
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to marshal handshake packet")
+		return
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PLAYER_HANDSHAKE,
+		Data: packetData,
+		Flag: network.PacketFlagReliable,
+	}
+
+	if err := s.networkServer.SendPacket(client, networkPacket); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to send handshake packet")
+		return
+	}
+
+	s.logger.Info().
+		Int32("playerID", int32(handshakePacket.YourID)).
+		Str("client", client.Addr.String()).
+		Msg("Sent handshake packet to new player")
+}
+
+// generatePlayerID generates a unique player ID (similar to C++ GetFreeID())
+func (s *Server) generatePlayerID() types.PlayerID {
+	allPlayers := s.playerManager.GetAllPlayers()
+	return types.PlayerID(len(allPlayers) + 1)
 }
