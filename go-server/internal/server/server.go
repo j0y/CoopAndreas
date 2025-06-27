@@ -45,6 +45,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 	switch packet.ID {
 	case types.CHECK_VERSION:
 		return s.handleCheckVersion(client, packet.Data)
+	case types.PLAYER_GET_NAME:
+		return s.handlePlayerGetName(client, packet.Data)
 	case types.PED_SPAWN:
 		return s.handlePedSpawn(client, packet.Data)
 	case types.PED_REMOVE:
@@ -530,4 +532,51 @@ func (s *Server) sendHandshakeTo(client *network.Client, handshakePacket *packet
 func (s *Server) generatePlayerID() types.PlayerID {
 	allPlayers := s.playerManager.GetAllPlayers()
 	return types.PlayerID(len(allPlayers) + 1)
+}
+
+// handlePlayerGetName handles PLAYER_GET_NAME packets
+func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error {
+	// Parse the player get name packet
+	var packet packets.PlayerGetNamePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PlayerGetName packet: %w", err)
+	}
+
+	// Get the player name as a string
+	playerName := packet.GetNameString()
+
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.Addr.String())
+	if player == nil {
+		s.logger.Warn().
+			Str("client", client.Addr.String()).
+			Str("name", playerName).
+			Msg("Received name from unknown player")
+		return fmt.Errorf("no player found for client %s", client.Addr)
+	}
+
+	// Update player name
+	oldName := player.Name
+	player.Name = playerName
+
+	s.logger.Info().
+		Str("client", client.Addr.String()).
+		Str("oldName", oldName).
+		Str("newName", playerName).
+		Int32("playerID", int32(player.ID)).
+		Msg("Player name updated")
+
+	// If this player wasn't already known to others (new connection), send chat message
+	// In C++ this checks m_bHasBeenConnectedBeforeMe, but for simplicity we'll log it differently
+	if oldName != playerName && strings.HasPrefix(oldName, "Player_") {
+		s.logger.Info().
+			Str("name", playerName).
+			Int32("playerID", int32(player.ID)).
+			Msg("Player introduced themselves")
+	}
+
+	// TODO: Trigger GameWeatherTime like in C++ (CPacketHandler::GameWeatherTime__Trigger)
+	// This would send current weather/time state to the newly named player
+
+	return nil
 }

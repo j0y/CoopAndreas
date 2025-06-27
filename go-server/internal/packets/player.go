@@ -64,6 +64,55 @@ func (p *PlayerHandshakePacket) Unmarshal(data []byte) error {
 	return binary.Read(buf, binary.LittleEndian, p)
 }
 
+// PlayerGetNamePacket represents a player's name update
+// This is sent from client to server after receiving handshake
+type PlayerGetNamePacket struct {
+	PlayerID types.PlayerID // Player ID (not used in C++ but included for completeness)
+	Name     [33]byte       // Player name (32 chars + null terminator)
+}
+
+// Marshal serializes the packet to binary format
+func (p *PlayerGetNamePacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PlayerGetNamePacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
+// GetNameString returns the name as a Go string (null-terminated)
+func (p *PlayerGetNamePacket) GetNameString() string {
+	// Find the null terminator and return substring
+	for i, b := range p.Name {
+		if b == 0 {
+			return string(p.Name[:i])
+		}
+	}
+	return string(p.Name[:])
+}
+
+// SetNameString sets the name from a Go string (adds null termination)
+func (p *PlayerGetNamePacket) SetNameString(name string) {
+	// Clear the name array
+	for i := range p.Name {
+		p.Name[i] = 0
+	}
+
+	// Copy the name (up to 32 characters)
+	nameBytes := []byte(name)
+	maxLen := len(p.Name) - 1 // Reserve space for null terminator
+	if len(nameBytes) > maxLen {
+		nameBytes = nameBytes[:maxLen]
+	}
+
+	copy(p.Name[:], nameBytes)
+	// Null terminator is already there from clearing
+}
+
 // NewPlayerConnectedPacket creates a new player connected notification
 func NewPlayerConnectedPacket(playerID types.PlayerID, isAlreadyConnected bool) *PlayerConnectedPacket {
 	packet := &PlayerConnectedPacket{
@@ -92,4 +141,13 @@ func NewPlayerHandshakePacket(playerID types.PlayerID) *PlayerHandshakePacket {
 	return &PlayerHandshakePacket{
 		YourID: playerID,
 	}
+}
+
+// NewPlayerGetNamePacket creates a new player get name packet
+func NewPlayerGetNamePacket(playerID types.PlayerID, name string) *PlayerGetNamePacket {
+	packet := &PlayerGetNamePacket{
+		PlayerID: playerID,
+	}
+	packet.SetNameString(name)
+	return packet
 }
