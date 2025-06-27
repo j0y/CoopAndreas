@@ -30,6 +30,12 @@ func main() {
 	
 	log.Info().Msg("Connected to server")
 	
+	// Test CheckVersion packet first
+	testCheckVersion(conn)
+	
+	// Wait a bit
+	time.Sleep(1 * time.Second)
+	
 	// Test PedSpawn packet
 	testPedSpawn(conn)
 	
@@ -102,6 +108,36 @@ func testPedRemove(conn net.Conn) {
 	}
 	
 	log.Info().Msg("PedRemove packet sent")
+}
+
+func testCheckVersion(conn net.Conn) {
+	log.Info().Msg("Testing CheckVersion packet")
+	
+	// Create a CheckVersion packet
+	versionCheck := packets.CheckVersionPacket{
+		ProtocolVersion: types.ProtocolVersion,
+	}
+	
+	// Set client version
+	copy(versionCheck.ClientVersion[:], types.ServerVersion) // Use server version as client version for testing
+	
+	// Marshal packet data
+	packetData, err := versionCheck.Marshal()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to marshal CheckVersion")
+		return
+	}
+	
+	// Create network packet
+	networkPacket := createNetworkPacket(types.CHECK_VERSION, packetData)
+	
+	// Send packet
+	if _, err := conn.Write(networkPacket); err != nil {
+		log.Error().Err(err).Msg("Failed to send CheckVersion")
+		return
+	}
+	
+	log.Info().Msg("CheckVersion packet sent")
 }
 
 func createNetworkPacket(id types.PacketID, data []byte) []byte {

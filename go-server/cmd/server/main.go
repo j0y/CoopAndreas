@@ -12,10 +12,11 @@ import (
 
 	"coopandreas-server/internal/network"
 	"coopandreas-server/internal/server"
+	cooptypes "coopandreas-server/internal/types"
 )
 
 const (
-	Version = "0.1.1-alpha-go"
+	Version = cooptypes.ServerVersion
 	Port    = 6767
 )
 
