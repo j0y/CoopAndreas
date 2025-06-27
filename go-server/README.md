@@ -14,6 +14,8 @@ This is a Go port of the CoopAndreas multiplayer server, now **fully compatible 
 - ✅ Component-based logging with context
 - ✅ **PLAYER_GET_NAME packet handling** (for name synchronization)
 - ✅ **PLAYER_DISCONNECTED packet handling** (for clean disconnection notification)
+- ✅ **PLAYER_ONFOOT packet handling** (for player movement and state updates)
+- ✅ **MASS_PACKET_SEQUENCE packet handling** (for efficient packet bundling)
 - ✅ **Version negotiation and compatibility checks**
 
 ## Architecture
@@ -50,6 +52,45 @@ internal/
 ## Protocol Compatibility
 
 The Go server is now **100% compatible** with C++ clients through ENet:
+
+### Supported Packets
+
+| Packet Type | Status | Description |
+|-------------|--------|-------------|
+| `CHECK_VERSION` | ✅ | Version negotiation between client/server |
+| `PLAYER_CONNECTED` | ✅ | Player connection notification |
+| `PLAYER_DISCONNECTED` | ✅ | Player disconnection notification |
+| `PLAYER_GET_NAME` | ✅ | Player name synchronization |
+| `PLAYER_ONFOOT` | ✅ | Player movement and state updates |
+| `PED_SPAWN` | ✅ | Ped creation with validation |
+| `PED_REMOVE` | ✅ | Ped deletion |
+| `PED_ONFOOT` | ✅ | Ped movement synchronization |
+| `MASS_PACKET_SEQUENCE` | ✅ | Bundled packet sequences for efficiency |
+
+### Mass Packet Sequences
+
+The server supports MASS_PACKET_SEQUENCE packets for efficient network communication:
+
+```go
+// Create a mass packet builder
+builder := packets.NewMassPacketBuilder()
+
+// Add multiple packets
+builder.AddPacket(types.PED_SPAWN, pedSpawnData)
+builder.AddPacket(types.PED_ONFOOT, pedOnFootData)
+
+// Build and send
+massPacket, err := builder.Build()
+if err == nil {
+    data, _ := massPacket.Marshal()
+    // Send to clients...
+}
+```
+
+The mass packet format matches the C++ implementation:
+- `[packet_count:1][packet_id:2][packet_data:variable]...`
+- Server rebroadcasts mass packets to all clients (except sender)
+- Efficient for bulk operations like initial sync
 
 The packet structures are designed to be binary-compatible with the C++ implementation:
 
