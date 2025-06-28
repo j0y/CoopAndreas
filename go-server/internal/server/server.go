@@ -59,6 +59,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handlePedRemove(client, packet.Data)
 	case types.PED_ONFOOT:
 		return s.handlePedOnFoot(client, packet.Data)
+	case types.PED_DRIVER_UPDATE:
+		return s.handlePedDriverUpdate(client, packet.Data)
 	case types.PLAYER_KEY_SYNC:
 		return s.handlePlayerKeySync(client, packet.Data)
 	case types.RESPAWN_PLAYER:

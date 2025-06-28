@@ -202,6 +202,73 @@ func (s *Server) handlePedOnFoot(client *network.Client, data []byte) error {
 	return nil
 }
 
+// handlePedDriverUpdate handles PED_DRIVER_UPDATE packets
+func (s *Server) handlePedDriverUpdate(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Debug: Check packet size (expected size based on C++ struct)
+	packets.DebugPacketSize("PED_DRIVER_UPDATE", data, 124) // Approximate size based on struct
+
+	// Parse the packet
+	var packet packets.PedDriverUpdatePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PedDriverUpdate packet: %w", err)
+	}
+
+	// Get the ped
+	ped := s.pedManager.GetPed(packet.PedID)
+	if ped == nil {
+		return nil // Ped doesn't exist, ignore
+	}
+
+	// Validate ownership (anti-cheat check) - matching C++ logic
+	if ped.Syncer != player {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Int32("pedID", int32(packet.PedID)).
+			Msg("Player tried to sync (driver) someone else's pedestrian - possible hack or bug")
+		return nil // Don't return error, just ignore
+	}
+
+	// Update ped position (matching C++ logic)
+	ped.Position = packet.Position
+
+	// Update vehicle if it exists (matching C++ logic)
+	vehicle := s.vehicleManager.GetVehicle(types.VehicleID(packet.VehicleID))
+	if vehicle != nil {
+		vehicle.Position = packet.Position
+		vehicle.FullRotation = packet.Rotation // Use FullRotation for 3D rotation
+	}
+
+	// Broadcast to all other clients (unreliable for frequent updates)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal ped driver update packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PED_DRIVER_UPDATE,
+		Data: packetData,
+		Flag: 0, // Unreliable for frequent position updates (matching C++ logic)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast ped driver update: %w", err)
+	}
+
+	s.logger.Debug().
+		Str("player", player.Name).
+		Int32("pedID", int32(packet.PedID)).
+		Int32("vehicleID", packet.VehicleID).
+		Msg("Player sent ped driver update")
+
+	return nil
+}
+
 // sendExistingPedsTo sends information about all existing peds to a new player
 func (s *Server) sendExistingPedsTo(client *network.Client) {
 	allPeds := s.pedManager.GetAllPeds()
