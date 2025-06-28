@@ -74,3 +74,37 @@ func NewPlayerStatsPacket(playerID types.PlayerID, stats [14]float32) *PlayerSta
 		Stats:    stats,
 	}
 }
+
+// RebuildPlayerPacket represents player appearance/clothes rebuilding data
+// This matches the C++ CPackets::RebuildPlayer structure exactly
+type RebuildPlayerPacket struct {
+	PlayerID    types.PlayerID // Player ID (matches C++ int playerid)
+	ModelKeys   [10]uint32     // Model keys for clothes/appearance (matches C++ unsigned int m_anModelKeys[10])
+	TextureKeys [18]uint32     // Texture keys for clothes/appearance (matches C++ unsigned int m_anTextureKeys[18])
+	FatStat     float32        // Fat statistic (matches C++ float m_fFatStat)
+	MuscleStat  float32        // Muscle statistic (matches C++ float m_fMuscleStat)
+}
+
+// Marshal serializes the packet to binary format
+func (p *RebuildPlayerPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *RebuildPlayerPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
+// NewRebuildPlayerPacket creates a new rebuild player packet
+func NewRebuildPlayerPacket(playerID types.PlayerID, modelKeys [10]uint32, textureKeys [18]uint32, fatStat, muscleStat float32) *RebuildPlayerPacket {
+	return &RebuildPlayerPacket{
+		PlayerID:    playerID,
+		ModelKeys:   modelKeys,
+		TextureKeys: textureKeys,
+		FatStat:     fatStat,
+		MuscleStat:  muscleStat,
+	}
+}

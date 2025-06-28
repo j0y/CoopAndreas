@@ -267,6 +267,37 @@ func (s *Server) sendExistingPlayersTo(client *network.Client, newPlayer *entiti
 					Msg("Sent existing player stats to new player")
 			}
 		}
+
+		// Send player clothes/appearance if they have been modified (matching C++ logic)
+		if existingPlayer.ClothesModified {
+			rebuildPacket := packets.NewRebuildPlayerPacket(
+				existingPlayer.ID,
+				existingPlayer.ModelKeys,
+				existingPlayer.TextureKeys,
+				existingPlayer.FatStat,
+				existingPlayer.MuscleStat,
+			)
+			rebuildData, err := rebuildPacket.Marshal()
+			if err != nil {
+				s.logger.Error().Err(err).Msg("Failed to marshal rebuild player packet")
+				continue
+			}
+
+			rebuildNetworkPacket := &network.NetworkPacket{
+				ID:   types.REBUILD_PLAYER,
+				Data: rebuildData,
+				Flag: network.PacketFlagReliable,
+			}
+
+			if err := s.networkServer.SendPacket(client, rebuildNetworkPacket); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send rebuild player packet")
+			} else {
+				s.logger.Debug().
+					Int32("existingPlayerID", int32(existingPlayer.ID)).
+					Str("newPlayer", newPlayer.Name).
+					Msg("Sent existing player clothes to new player")
+			}
+		}
 	}
 }
 
@@ -446,6 +477,58 @@ func (s *Server) handlePlayerStats(client *network.Client, data []byte) error {
 
 	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
 		return fmt.Errorf("failed to broadcast player stats: %w", err)
+	}
+
+	return nil
+}
+
+// handleRebuildPlayer handles REBUILD_PLAYER packets
+// This matches the C++ CPlayerPackets::RebuildPlayer::Handle() functionality
+func (s *Server) handleRebuildPlayer(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.RebuildPlayerPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal RebuildPlayer packet: %w", err)
+	}
+
+	// Set the player ID (security measure - don't trust client, matching C++ logic)
+	packet.PlayerID = player.ID
+
+	s.logger.Debug().
+		Int32("playerID", int32(packet.PlayerID)).
+		Str("player", player.Name).
+		Float32("fatStat", packet.FatStat).
+		Float32("muscleStat", packet.MuscleStat).
+		Msg("Received player rebuild request")
+
+	// Store the clothes/appearance data in the player entity (matching C++ logic)
+	player.ModelKeys = packet.ModelKeys
+	player.TextureKeys = packet.TextureKeys
+	player.FatStat = packet.FatStat
+	player.MuscleStat = packet.MuscleStat
+	player.ClothesModified = true
+
+	// Broadcast the rebuild packet to all other clients (reliable packet)
+	// This matches the C++ logic: CNetwork::SendPacketToAll(CPacketsID::REBUILD_PLAYER, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal rebuild player packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.REBUILD_PLAYER,
+		Data: packetData,
+		Flag: network.PacketFlagReliable, // Reliable for important player appearance changes
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast rebuild player: %w", err)
 	}
 
 	return nil

@@ -15,6 +15,12 @@ type Player struct {
 	// Player statistics (matching C++ m_afStats[14])
 	Stats         [14]float32 // Player stats (strength, stamina, etc.)
 	StatsModified bool        // Whether stats have been modified (matching C++ m_ucSyncFlags.bStatsModified)
+	// Player appearance/clothes (matching C++ clothes data)
+	ModelKeys       [10]uint32 // Model keys for clothes/appearance (matches C++ m_anModelKeys[10])
+	TextureKeys     [18]uint32 // Texture keys for clothes/appearance (matches C++ m_anTextureKeys[18])
+	FatStat         float32    // Fat statistic (matches C++ m_fFatStat)
+	MuscleStat      float32    // Muscle statistic (matches C++ m_fMuscleStat)
+	ClothesModified bool       // Whether clothes have been modified (matching C++ m_ucSyncFlags.bClothesModified)
 }
 
 // Ped represents a pedestrian/NPC in the game
