@@ -159,8 +159,8 @@ func (s *Server) handlePedOnFoot(client *network.Client, data []byte) error {
 		return fmt.Errorf("no player found for client %s", client.Addr)
 	}
 
-	// Debug: Check packet size (expected: 60 bytes based on C++ struct)
-	packets.DebugPacketSize("PED_ONFOOT", data, 60)
+	// Debug: Check packet size (expected: 59 bytes based on C++ struct)
+	packets.DebugPacketSize("PED_ONFOOT", data, 59)
 
 	// Parse the packet
 	var packet packets.PedOnFootPacket
