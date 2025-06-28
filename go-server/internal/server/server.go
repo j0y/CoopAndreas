@@ -63,6 +63,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleRespawnPlayer(client, packet.Data)
 	case types.PLAYER_SET_HOST:
 		return s.handlePlayerSetHost(client, packet.Data)
+	case types.PLAYER_STATS:
+		return s.handlePlayerStats(client, packet.Data)
 	case types.VEHICLE_SPAWN:
 		return s.handleVehicleSpawn(client, packet.Data)
 	case types.VEHICLE_REMOVE:

@@ -12,6 +12,9 @@ type Player struct {
 	Name     string
 	PeerAddr string // IP:Port for identification
 	IsHost   bool
+	// Player statistics (matching C++ m_afStats[14])
+	Stats         [14]float32 // Player stats (strength, stamina, etc.)
+	StatsModified bool        // Whether stats have been modified (matching C++ m_ucSyncFlags.bStatsModified)
 }
 
 // Ped represents a pedestrian/NPC in the game

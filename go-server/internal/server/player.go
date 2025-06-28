@@ -242,6 +242,31 @@ func (s *Server) sendExistingPlayersTo(client *network.Client, newPlayer *entiti
 			Int32("existingPlayerID", int32(existingPlayer.ID)).
 			Str("newPlayer", newPlayer.Name).
 			Msg("Sent existing player info to new player")
+
+		// Send player stats if they have been modified (matching C++ logic)
+		if existingPlayer.StatsModified {
+			statsPacket := packets.NewPlayerStatsPacket(existingPlayer.ID, existingPlayer.Stats)
+			statsData, err := statsPacket.Marshal()
+			if err != nil {
+				s.logger.Error().Err(err).Msg("Failed to marshal player stats packet")
+				continue
+			}
+
+			statsNetworkPacket := &network.NetworkPacket{
+				ID:   types.PLAYER_STATS,
+				Data: statsData,
+				Flag: network.PacketFlagReliable,
+			}
+
+			if err := s.networkServer.SendPacket(client, statsNetworkPacket); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send player stats packet")
+			} else {
+				s.logger.Debug().
+					Int32("existingPlayerID", int32(existingPlayer.ID)).
+					Str("newPlayer", newPlayer.Name).
+					Msg("Sent existing player stats to new player")
+			}
+		}
 	}
 }
 
@@ -372,6 +397,55 @@ func (s *Server) handleRespawnPlayer(client *network.Client, data []byte) error 
 
 	if err := s.networkServer.SendPacketToAll(networkPacket, nil); err != nil {
 		return fmt.Errorf("failed to broadcast RespawnPlayer: %w", err)
+	}
+
+	return nil
+}
+
+// handlePlayerStats handles PLAYER_STATS packets
+// This matches the C++ CPlayerPackets::PlayerStats::Handle() functionality
+func (s *Server) handlePlayerStats(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.PlayerStatsPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PlayerStats packet: %w", err)
+	}
+
+	// Set the player ID (security measure - don't trust client, matching C++ logic)
+	packet.PlayerID = player.ID
+
+	s.logger.Debug().
+		Int32("playerID", int32(packet.PlayerID)).
+		Str("player", player.Name).
+		Float32("stat0", packet.Stats[0]).
+		Float32("stat1", packet.Stats[1]).
+		Msg("Received player stats update")
+
+	// Store the stats in the player entity (matching C++ logic)
+	player.Stats = packet.Stats
+	player.StatsModified = true
+
+	// Broadcast the stats packet to all other clients (reliable packet)
+	// This matches the C++ logic: CNetwork::SendPacketToAll(CPacketsID::PLAYER_STATS, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal player stats packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PLAYER_STATS,
+		Data: packetData,
+		Flag: network.PacketFlagReliable, // Reliable for important player state changes
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast player stats: %w", err)
 	}
 
 	return nil

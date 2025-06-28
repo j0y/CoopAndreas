@@ -3,6 +3,8 @@ package packets
 import (
 	"bytes"
 	"encoding/binary"
+
+	"coopandreas-server/internal/types"
 )
 
 // GameWeatherTimePacket represents weather and time synchronization data
@@ -42,5 +44,33 @@ func NewGameWeatherTimePacket(newWeather, oldWeather, forcedWeather, month, day,
 		CurrentHour:   hour,
 		CurrentMinute: minute,
 		GameTickCount: gameTickCount,
+	}
+}
+
+// PlayerStatsPacket represents player statistics synchronization data
+// This matches the C++ CPackets::PlayerStats structure exactly
+type PlayerStatsPacket struct {
+	PlayerID types.PlayerID // Player ID (matches C++ int playerid)
+	Stats    [14]float32    // Player statistics array (matches C++ float stats[14])
+}
+
+// Marshal serializes the packet to binary format
+func (p *PlayerStatsPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PlayerStatsPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
+// NewPlayerStatsPacket creates a new player stats packet
+func NewPlayerStatsPacket(playerID types.PlayerID, stats [14]float32) *PlayerStatsPacket {
+	return &PlayerStatsPacket{
+		PlayerID: playerID,
+		Stats:    stats,
 	}
 }
