@@ -132,3 +132,72 @@ func (s *Server) sendExistingVehiclesTo(client *network.Client) {
 			Msg("Sent existing vehicle info to new player")
 	}
 }
+
+// handleVehicleRemove handles VEHICLE_REMOVE packets
+func (s *Server) handleVehicleRemove(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.Addr.String())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.Addr)
+	}
+
+	// Parse the packet
+	var packet packets.VehicleRemovePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal VehicleRemove packet: %w", err)
+	}
+
+	s.logger.Debug().
+		Int32("vehicleID", packet.VehicleID).
+		Str("player", player.Name).
+		Msg("Received vehicle remove request")
+
+	// Get the vehicle
+	vehicle := s.vehicleManager.GetVehicle(types.VehicleID(packet.VehicleID))
+	if vehicle == nil {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("player", player.Name).
+			Msg("Vehicle not found for removal")
+		return nil // Not an error - vehicle might already be removed
+	}
+
+	// Check if the player is authorized to remove this vehicle
+	// Only the syncer (creator) can remove the vehicle
+	if vehicle.Syncer != player {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("player", player.Name).
+			Str("syncer", vehicle.Syncer.Name).
+			Msg("Player attempted to remove vehicle they don't own")
+		return nil // Ignore unauthorized removal attempts
+	}
+
+	// Remove from vehicle manager
+	s.vehicleManager.RemoveVehicle(types.VehicleID(packet.VehicleID))
+
+	// Broadcast removal to all other clients (reliable packet)
+	// This matches the C++ logic: CNetwork::SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal vehicle remove packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.VEHICLE_REMOVE,
+		Data: packetData,
+		Flag: network.PacketFlagReliable, // Reliable for important removal events
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast vehicle remove: %w", err)
+	}
+
+	s.logger.Info().
+		Int32("vehicleID", packet.VehicleID).
+		Str("player", player.Name).
+		Uint16("modelID", vehicle.ModelID).
+		Msg("Vehicle removed")
+
+	return nil
+}
