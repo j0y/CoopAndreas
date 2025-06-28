@@ -39,14 +39,16 @@ type Ped struct {
 
 // PlayerManager manages all connected players
 type PlayerManager struct {
-	players map[string]*Player // key: unique client ID (not peer address)
-	mutex   sync.RWMutex
+	players   map[string]*Player // key: unique client ID (not peer address)
+	joinOrder []*Player          // tracks players in join order (like C++ vector)
+	mutex     sync.RWMutex
 }
 
 // NewPlayerManager creates a new player manager
 func NewPlayerManager() *PlayerManager {
 	return &PlayerManager{
-		players: make(map[string]*Player),
+		players:   make(map[string]*Player),
+		joinOrder: make([]*Player, 0),
 	}
 }
 
@@ -55,6 +57,7 @@ func (pm *PlayerManager) AddPlayer(clientID string, player *Player) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 	pm.players[clientID] = player
+	pm.joinOrder = append(pm.joinOrder, player) // Track join order like C++ vector
 }
 
 // GetPlayer retrieves a player by client ID
@@ -68,18 +71,30 @@ func (pm *PlayerManager) GetPlayer(clientID string) *Player {
 func (pm *PlayerManager) RemovePlayer(clientID string) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
+
+	player := pm.players[clientID]
 	delete(pm.players, clientID)
+
+	// Also remove from join order slice
+	if player != nil {
+		for i, p := range pm.joinOrder {
+			if p == player {
+				// Remove from slice preserving order
+				pm.joinOrder = append(pm.joinOrder[:i], pm.joinOrder[i+1:]...)
+				break
+			}
+		}
+	}
 }
 
-// GetAllPlayers returns all connected players
+// GetAllPlayers returns all connected players in join order
 func (pm *PlayerManager) GetAllPlayers() []*Player {
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
 
-	players := make([]*Player, 0, len(pm.players))
-	for _, player := range pm.players {
-		players = append(players, player)
-	}
+	// Return a copy of the join order slice to maintain ordering
+	players := make([]*Player, len(pm.joinOrder))
+	copy(players, pm.joinOrder)
 	return players
 }
 
@@ -97,31 +112,29 @@ func (pm *PlayerManager) GetHost() *Player {
 }
 
 // AssignHostToFirstPlayer assigns host status to the first connected player
-// This matches the C++ CPlayerManager::AssignHostToFirstPlayer() logic
+// This matches the C++ CPlayerManager::AssignHostToFirstPlayer() logic exactly
 func (pm *PlayerManager) AssignHostToFirstPlayer() *Player {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
-	if len(pm.players) <= 0 {
+	if len(pm.joinOrder) <= 0 {
 		return nil
 	}
 
-	// Check if there's already a host
+	// Get the first player that joined (matching C++ m_pPlayers.front())
+	firstPlayer := pm.joinOrder[0]
+
+	// Get current host
 	currentHost := pm.getHostUnsafe()
+
+	// If the first player is already the host, no need to change anything
+	if firstPlayer == currentHost {
+		return firstPlayer
+	}
+
+	// Remove host status from current host (if any)
 	if currentHost != nil {
-		// There's already a host, don't reassign
-		return currentHost
-	}
-
-	// Find the first player (in Go maps are unordered, so we'll pick any player)
-	var firstPlayer *Player
-	for _, player := range pm.players {
-		firstPlayer = player
-		break
-	}
-
-	if firstPlayer == nil {
-		return nil
+		currentHost.IsHost = false
 	}
 
 	// Assign host status to the first player

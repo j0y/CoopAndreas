@@ -243,6 +243,34 @@ func (s *Server) sendExistingPlayersTo(client *network.Client, newPlayer *entiti
 			Str("newPlayer", newPlayer.Name).
 			Msg("Sent existing player info to new player")
 
+		// Send PLAYER_GET_NAME packet for existing player (matching C++ logic)
+		// This tells the new player what the existing player's name is
+		getNamePacket := packets.PlayerGetNamePacket{
+			PlayerID: existingPlayer.ID,
+		}
+		getNamePacket.SetNameString(existingPlayer.Name)
+
+		getNameData, err := getNamePacket.Marshal()
+		if err != nil {
+			s.logger.Error().Err(err).Msg("Failed to marshal player get name packet")
+		} else {
+			getNameNetworkPacket := &network.NetworkPacket{
+				ID:   types.PLAYER_GET_NAME,
+				Data: getNameData,
+				Flag: network.PacketFlagReliable,
+			}
+
+			if err := s.networkServer.SendPacket(client, getNameNetworkPacket); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send player get name packet")
+			} else {
+				s.logger.Debug().
+					Int32("existingPlayerID", int32(existingPlayer.ID)).
+					Str("existingPlayerName", existingPlayer.Name).
+					Str("newPlayer", newPlayer.Name).
+					Msg("Sent existing player name to new player")
+			}
+		}
+
 		// Send player stats if they have been modified (matching C++ logic)
 		if existingPlayer.StatsModified {
 			statsPacket := packets.NewPlayerStatsPacket(existingPlayer.ID, existingPlayer.Stats)

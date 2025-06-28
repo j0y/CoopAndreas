@@ -48,13 +48,11 @@ func (s *Server) HandlePlayerConnect(client *network.Client) {
 	handshakePacket := packets.NewPlayerHandshakePacket(player.ID)
 	s.sendHandshakeTo(client, handshakePacket)
 
-	// Send current weather/time state to the new player (server-to-client synchronization)
-	// This ensures new players receive the current weather state upon joining
-	if err := s.sendCurrentWeatherTimeTo(client); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to send current weather/time to new player")
-	}
+	// Note: Weather/time synchronization is NOT sent here in C++ implementation
+	// It's only sent when a client becomes host and sends weather data to the server
+	// The C++ server doesn't proactively send weather data during connection
 
-	// Assign host if no current host exists (first player becomes host)
+	// Assign host status (matching C++ logic - always call, let function decide)
 	if s.playerManager.GetHost() == nil {
 		s.logger.Debug().Msg("No current host found, assigning host to first player")
 		if err := s.assignHostToFirstPlayer(); err != nil {
