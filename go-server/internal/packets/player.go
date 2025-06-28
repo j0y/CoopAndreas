@@ -232,6 +232,25 @@ func (p *PlayerSetHostPacket) Unmarshal(data []byte) error {
 	return binary.Read(buf, binary.LittleEndian, p)
 }
 
+// RespawnPlayerPacket represents a notification that a player has respawned
+// This matches the C++ CPackets::RespawnPlayer structure exactly
+type RespawnPlayerPacket struct {
+	PlayerID types.PlayerID // Player ID that respawned (matches C++ int playerid)
+}
+
+// Marshal serializes the packet to binary format
+func (p *RespawnPlayerPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *RespawnPlayerPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
 // NewPlayerConnectedPacket creates a new player connected notification
 func NewPlayerConnectedPacket(playerID types.PlayerID, isAlreadyConnected bool) *PlayerConnectedPacket {
 	packet := &PlayerConnectedPacket{
@@ -321,5 +340,12 @@ func NewPlayerKeySyncPacket(playerID types.PlayerID, leftStickX, leftStickY int1
 func NewPlayerSetHostPacket(playerID types.PlayerID) *PlayerSetHostPacket {
 	return &PlayerSetHostPacket{
 		ID: playerID,
+	}
+}
+
+// NewRespawnPlayerPacket creates a new player respawn notification
+func NewRespawnPlayerPacket(playerID types.PlayerID) *RespawnPlayerPacket {
+	return &RespawnPlayerPacket{
+		PlayerID: playerID,
 	}
 }

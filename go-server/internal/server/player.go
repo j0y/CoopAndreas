@@ -323,3 +323,46 @@ func (s *Server) assignHostToFirstPlayer() error {
 
 	return nil
 }
+
+// handleRespawnPlayer handles RESPAWN_PLAYER packets
+// This matches the C++ CPlayerPackets::RespawnPlayer::Handle() functionality
+func (s *Server) handleRespawnPlayer(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet (though it only contains player ID that we'll override)
+	var packet packets.RespawnPlayerPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal RespawnPlayer packet: %w", err)
+	}
+
+	s.logger.Info().
+		Int32("playerID", int32(player.ID)).
+		Str("playerName", player.Name).
+		Msg("Player respawned")
+
+	// Set the correct player ID (matching C++ logic: packet->playerid = CPlayerManager::GetPlayer(peer)->m_iPlayerId;)
+	packet.PlayerID = player.ID
+
+	// Marshal the updated packet
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal RespawnPlayer packet: %w", err)
+	}
+
+	// Broadcast to all clients (matching C++ logic: SendPacketToAll with ENET_PACKET_FLAG_RELIABLE)
+	networkPacket := &network.NetworkPacket{
+		ID:   types.RESPAWN_PLAYER,
+		Data: packetData,
+		Flag: network.PacketFlagReliable, // Reliable for important respawn notifications
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, nil); err != nil {
+		return fmt.Errorf("failed to broadcast RespawnPlayer: %w", err)
+	}
+
+	return nil
+}
