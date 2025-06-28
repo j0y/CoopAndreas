@@ -657,3 +657,54 @@ func (s *Server) handlePlayerPlaceWaypoint(client *network.Client, data []byte) 
 
 	return nil
 }
+
+// handlePlayerBulletShot handles PLAYER_BULLET_SHOT packets
+// This matches the C++ CPlayerPackets::PlayerBulletShot::Handle() functionality
+func (s *Server) handlePlayerBulletShot(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.PlayerBulletShotPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PlayerBulletShot packet: %w", err)
+	}
+
+	// Set the player ID (security measure - don't trust client, matching C++ logic)
+	packet.PlayerID = int32(player.ID)
+
+	s.logger.Debug().
+		Str("player", player.Name).
+		Int32("targetID", packet.TargetID).
+		Uint8("entityType", uint8(packet.EntityType)).
+		Float32("startX", packet.StartPos.X).
+		Float32("startY", packet.StartPos.Y).
+		Float32("startZ", packet.StartPos.Z).
+		Float32("endX", packet.EndPos.X).
+		Float32("endY", packet.EndPos.Y).
+		Float32("endZ", packet.EndPos.Z).
+		Int32("incrementalHit", packet.IncrementalHit).
+		Msg("Player bullet shot")
+
+	// Broadcast to all other clients (unreliable packet, high frequency)
+	// This matches the C++ logic: SendPacketToAll with (ENetPacketFlag)0 (unreliable)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal player bullet shot packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PLAYER_BULLET_SHOT,
+		Data: packetData,
+		Flag: 0, // Unreliable for frequent bullet shot events (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast player bullet shot: %w", err)
+	}
+
+	return nil
+}

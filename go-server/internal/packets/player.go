@@ -251,6 +251,32 @@ func (p *RespawnPlayerPacket) Unmarshal(data []byte) error {
 	return binary.Read(buf, binary.LittleEndian, p)
 }
 
+// PlayerBulletShotPacket represents a bullet shot event from a player
+// This matches the C++ CPlayerPackets::PlayerBulletShot structure exactly
+// The collision point is represented as 44 bytes of padding to match server implementation
+type PlayerBulletShotPacket struct {
+	PlayerID       int32                   // Player ID (set by server)
+	TargetID       int32                   // Target entity ID (-1 if no target)
+	StartPos       types.Vector3           // Bullet start position
+	EndPos         types.Vector3           // Bullet end position
+	ColPoint       [44]uint8               // Collision point data (44 bytes padding, matching C++ server)
+	IncrementalHit int32                   // Incremental hit value
+	EntityType     types.NetworkEntityType // Type of entity hit (if any)
+}
+
+// Marshal serializes the packet to binary format
+func (p *PlayerBulletShotPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PlayerBulletShotPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
 // NewPlayerConnectedPacket creates a new player connected notification
 func NewPlayerConnectedPacket(playerID types.PlayerID, isAlreadyConnected bool) *PlayerConnectedPacket {
 	packet := &PlayerConnectedPacket{
@@ -347,5 +373,18 @@ func NewPlayerSetHostPacket(playerID types.PlayerID) *PlayerSetHostPacket {
 func NewRespawnPlayerPacket(playerID types.PlayerID) *RespawnPlayerPacket {
 	return &RespawnPlayerPacket{
 		PlayerID: playerID,
+	}
+}
+
+// NewPlayerBulletShotPacket creates a new player bullet shot packet
+func NewPlayerBulletShotPacket(playerID types.PlayerID, targetID int32, startPos, endPos types.Vector3, entityType types.NetworkEntityType, incrementalHit int32) *PlayerBulletShotPacket {
+	return &PlayerBulletShotPacket{
+		PlayerID:       int32(playerID),
+		TargetID:       targetID,
+		StartPos:       startPos,
+		EndPos:         endPos,
+		ColPoint:       [44]uint8{}, // Zero-initialized collision point data
+		IncrementalHit: incrementalHit,
+		EntityType:     entityType,
 	}
 }

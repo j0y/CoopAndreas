@@ -53,6 +53,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handlePlayerPlaceWaypoint(client, packet.Data)
 	case types.PLAYER_ONFOOT:
 		return s.handlePlayerOnFoot(client, packet.Data)
+	case types.PLAYER_BULLET_SHOT:
+		return s.handlePlayerBulletShot(client, packet.Data)
 	case types.PED_SPAWN:
 		return s.handlePedSpawn(client, packet.Data)
 	case types.PED_REMOVE:

@@ -69,7 +69,7 @@ type Vector3 struct {
 // PlayerID represents a unique player identifier
 type PlayerID int32
 
-// PedID represents a unique pedestrian identifier  
+// PedID represents a unique pedestrian identifier
 type PedID int32
 
 // VehicleID represents a unique vehicle identifier
@@ -77,7 +77,21 @@ type VehicleID int32
 
 // Server version information
 const (
-	ServerVersion     = "0.1.1"
-	ProtocolVersion   = 1
-	MinClientVersion  = "0.1.1"
+	ServerVersion    = "0.1.1"
+	ProtocolVersion  = 1
+	MinClientVersion = "0.1.1"
+)
+
+// NetworkEntityType represents different types of network entities
+type NetworkEntityType uint8
+
+const (
+	NETWORK_ENTITY_TYPE_PLAYER NetworkEntityType = iota
+	NETWORK_ENTITY_TYPE_NOTHING
+	NETWORK_ENTITY_TYPE_BUILDING
+	NETWORK_ENTITY_TYPE_VEHICLE
+	NETWORK_ENTITY_TYPE_PED
+	NETWORK_ENTITY_TYPE_OBJECT
+	NETWORK_ENTITY_TYPE_DUMMY
+	NETWORK_ENTITY_TYPE_NOTINPOOLS
 )
