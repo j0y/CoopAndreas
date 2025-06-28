@@ -60,18 +60,19 @@ func (p *PedRemovePacket) Unmarshal(data []byte) error {
 }
 
 // PedOnFootPacket matches the C++ PedOnFoot struct exactly
+// Note: Based on actual client packets, weaponState appears to be omitted (59 bytes vs 60 bytes expected)
 type PedOnFootPacket struct {
-	PedID           int32         // 4 bytes - int pedid
-	Position        types.Vector3 // 12 bytes - CVector pos
-	Velocity        types.Vector3 // 12 bytes - CVector velocity
-	Health          uint8         // 1 byte - unsigned char health
-	Armour          uint8         // 1 byte - unsigned char armour
-	Weapon          uint8         // 1 byte - unsigned char weapon
-	WeaponState     uint8         // 1 byte - unsigned char weaponState
-	Ammo            uint16        // 2 bytes - unsigned short ammo
-	AimingRotation  float32       // 4 bytes - float aimingRotation
-	CurrentRotation float32       // 4 bytes - float currentRotation
-	LookDirection   int32         // 4 bytes - int lookDirection
+	PedID    int32         // 4 bytes - int pedid
+	Position types.Vector3 // 12 bytes - CVector pos
+	Velocity types.Vector3 // 12 bytes - CVector velocity
+	Health   uint8         // 1 byte - unsigned char health
+	Armour   uint8         // 1 byte - unsigned char armour
+	Weapon   uint8         // 1 byte - unsigned char weapon
+	// weaponState field appears to be missing in client packets (59 bytes vs 60 expected)
+	Ammo            uint16  // 2 bytes - unsigned short ammo
+	AimingRotation  float32 // 4 bytes - float aimingRotation
+	CurrentRotation float32 // 4 bytes - float currentRotation
+	LookDirection   int32   // 4 bytes - int lookDirection
 	// Bitfield struct - represented as single byte in Go
 	// struct { unsigned char moveState:3; ducked:1; aiming:1; }
 	MoveStateAndFlags uint8         // 1 byte (moveState:3, ducked:1, aiming:1)
@@ -100,9 +101,6 @@ func (p *PedOnFootPacket) Marshal() ([]byte, error) {
 		return nil, err
 	}
 	if err := binary.Write(buf, binary.LittleEndian, p.Weapon); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(buf, binary.LittleEndian, p.WeaponState); err != nil {
 		return nil, err
 	}
 	if err := binary.Write(buf, binary.LittleEndian, p.Ammo); err != nil {
@@ -151,9 +149,6 @@ func (p *PedOnFootPacket) Unmarshal(data []byte) error {
 		return err
 	}
 	if err := binary.Read(buf, binary.LittleEndian, &p.Weapon); err != nil {
-		return err
-	}
-	if err := binary.Read(buf, binary.LittleEndian, &p.WeaponState); err != nil {
 		return err
 	}
 	if err := binary.Read(buf, binary.LittleEndian, &p.Ammo); err != nil {
