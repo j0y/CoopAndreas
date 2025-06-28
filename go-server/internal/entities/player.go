@@ -95,6 +95,13 @@ func (pm *PlayerManager) AssignHostToFirstPlayer() *Player {
 		return nil
 	}
 
+	// Check if there's already a host
+	currentHost := pm.getHostUnsafe()
+	if currentHost != nil {
+		// There's already a host, don't reassign
+		return currentHost
+	}
+
 	// Find the first player (in Go maps are unordered, so we'll pick any player)
 	var firstPlayer *Player
 	for _, player := range pm.players {
@@ -104,17 +111,6 @@ func (pm *PlayerManager) AssignHostToFirstPlayer() *Player {
 
 	if firstPlayer == nil {
 		return nil
-	}
-
-	// Check if this player is already the host
-	currentHost := pm.getHostUnsafe()
-	if currentHost == firstPlayer {
-		return firstPlayer
-	}
-
-	// Remove host status from current host
-	if currentHost != nil {
-		currentHost.IsHost = false
 	}
 
 	// Assign host status to the first player

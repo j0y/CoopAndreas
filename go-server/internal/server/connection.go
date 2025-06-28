@@ -48,6 +48,7 @@ func (s *Server) HandlePlayerConnect(client *network.Client) {
 
 	// Assign host if no current host exists (first player becomes host)
 	if s.playerManager.GetHost() == nil {
+		s.logger.Debug().Msg("No current host found, assigning host to first player")
 		if err := s.assignHostToFirstPlayer(); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to assign host to first player")
 		}
