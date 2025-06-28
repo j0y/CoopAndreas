@@ -27,7 +27,7 @@ type Ped struct {
 
 // PlayerManager manages all connected players
 type PlayerManager struct {
-	players map[string]*Player // key: peer address
+	players map[string]*Player // key: unique client ID (not peer address)
 	mutex   sync.RWMutex
 }
 
@@ -39,25 +39,24 @@ func NewPlayerManager() *PlayerManager {
 }
 
 // AddPlayer adds a new player
-func (pm *PlayerManager) AddPlayer(peerAddr string, player *Player) {
+func (pm *PlayerManager) AddPlayer(clientID string, player *Player) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
-	player.PeerAddr = peerAddr
-	pm.players[peerAddr] = player
+	pm.players[clientID] = player
 }
 
-// GetPlayer retrieves a player by peer address
-func (pm *PlayerManager) GetPlayer(peerAddr string) *Player {
+// GetPlayer retrieves a player by client ID
+func (pm *PlayerManager) GetPlayer(clientID string) *Player {
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
-	return pm.players[peerAddr]
+	return pm.players[clientID]
 }
 
 // RemovePlayer removes a player
-func (pm *PlayerManager) RemovePlayer(peerAddr string) {
+func (pm *PlayerManager) RemovePlayer(clientID string) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
-	delete(pm.players, peerAddr)
+	delete(pm.players, clientID)
 }
 
 // GetAllPlayers returns all connected players

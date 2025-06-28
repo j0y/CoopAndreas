@@ -12,9 +12,9 @@ import (
 // handlePedSpawn handles PED_SPAWN packets
 func (s *Server) handlePedSpawn(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.Addr.String())
+	player := s.playerManager.GetPlayer(client.GetClientID())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.Addr)
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
 
 	// Parse the packet
@@ -98,9 +98,9 @@ func (s *Server) handlePedSpawn(client *network.Client, data []byte) error {
 // handlePedRemove handles PED_REMOVE packets
 func (s *Server) handlePedRemove(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.Addr.String())
+	player := s.playerManager.GetPlayer(client.GetClientID())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.Addr)
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
 
 	// Parse the packet
@@ -154,9 +154,9 @@ func (s *Server) handlePedRemove(client *network.Client, data []byte) error {
 // handlePedOnFoot handles PED_ONFOOT packets
 func (s *Server) handlePedOnFoot(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.Addr.String())
+	player := s.playerManager.GetPlayer(client.GetClientID())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.Addr)
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
 
 	// Debug: Check packet size (expected: 59 bytes based on C++ struct)

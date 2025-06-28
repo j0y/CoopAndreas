@@ -29,6 +29,7 @@ const (
 
 // Client represents a connected client
 type Client struct {
+	ID         uint32 // Unique client ID (more reliable than peer address)
 	Addr       *net.UDPAddr
 	LastSeen   time.Time
 	Reliable   chan []byte // Channel for reliable packets
@@ -40,8 +41,9 @@ type Client struct {
 }
 
 // NewClient creates a new client instance
-func NewClient(addr *net.UDPAddr) *Client {
+func NewClient(id uint32, addr *net.UDPAddr) *Client {
 	return &Client{
+		ID:         id,
 		Addr:       addr,
 		LastSeen:   time.Now(),
 		Reliable:   make(chan []byte, 100),
@@ -62,6 +64,11 @@ func (c *Client) IsTimedOut() bool {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	return time.Since(c.LastSeen) > ServerTimeout
+}
+
+// GetClientID returns a unique string identifier for this client
+func (c *Client) GetClientID() string {
+	return fmt.Sprintf("client_%d", c.ID)
 }
 
 // NetworkPacket represents a network packet
@@ -242,7 +249,7 @@ func (s *Server) handleConnect(event enet.Event) {
 		}
 	}
 
-	client := NewClient(udpAddr)
+	client := NewClient(clientID, udpAddr)
 	client.ENetPeer = peer // Store the ENet peer for sending packets
 
 	s.clientsMutex.Lock()

@@ -22,7 +22,7 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 	playerName := packet.GetNameString()
 
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.Addr.String())
+	player := s.playerManager.GetPlayer(client.GetClientID())
 	if player == nil {
 		s.logger.Warn().
 			Str("client", client.Addr.String()).
@@ -60,9 +60,9 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 // handlePlayerOnFoot handles PLAYER_ONFOOT packets
 func (s *Server) handlePlayerOnFoot(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.Addr.String())
+	player := s.playerManager.GetPlayer(client.GetClientID())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.Addr)
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
 
 	// Parse the packet
@@ -131,9 +131,9 @@ func (s *Server) handlePlayerKeySync(client *network.Client, data []byte) error 
 		Msg("Received PLAYER_KEY_SYNC packet")
 
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.Addr.String())
+	player := s.playerManager.GetPlayer(client.GetClientID())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.Addr)
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
 
 	// Parse the packet
