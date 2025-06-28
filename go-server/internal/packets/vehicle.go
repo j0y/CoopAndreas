@@ -3,6 +3,7 @@ package packets
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"coopandreas-server/internal/types"
 )
@@ -137,6 +138,64 @@ func (p *VehicleDriverUpdatePacket) Unmarshal(data []byte) error {
 	return binary.Read(buf, binary.LittleEndian, p)
 }
 
+// VehicleEnterPacket represents a vehicle enter request/notification
+// This matches the C++ CPackets::VehicleEnter structure exactly
+// Note: C++ uses bitfields which need manual marshaling to match binary layout
+type VehicleEnterPacket struct {
+	PlayerID  types.PlayerID // Player ID entering the vehicle (matches C++ int playerid)
+	VehicleID int32          // Vehicle ID (matches C++ int vehicleid)
+	SeatID    uint8          // Seat ID (0=driver, 1-3=passengers) - matches C++ unsigned char seatid : 3
+	Force     bool           // Force enter flag - matches C++ unsigned char force : 1
+	Passenger bool           // Is passenger flag - matches C++ unsigned char passenger : 1
+}
+
+// Marshal serializes the packet to binary format
+// Manual marshaling to match C++ bitfield layout
+func (p *VehicleEnterPacket) Marshal() ([]byte, error) {
+	buf := make([]byte, 9) // 4 bytes playerid + 4 bytes vehicleid + 1 byte bitfield
+
+	// Write PlayerID (4 bytes)
+	binary.LittleEndian.PutUint32(buf[0:4], uint32(p.PlayerID))
+
+	// Write VehicleID (4 bytes)
+	binary.LittleEndian.PutUint32(buf[4:8], uint32(p.VehicleID))
+
+	// Pack bitfields into single byte (matches C++ bitfield layout)
+	var bitfield uint8
+	bitfield |= p.SeatID & 0x07 // 3 bits for seatid (0-7)
+	if p.Force {
+		bitfield |= 0x08 // bit 3 for force
+	}
+	if p.Passenger {
+		bitfield |= 0x10 // bit 4 for passenger
+	}
+	buf[8] = bitfield
+
+	return buf, nil
+}
+
+// Unmarshal deserializes binary data to packet
+// Manual unmarshaling to match C++ bitfield layout
+func (p *VehicleEnterPacket) Unmarshal(data []byte) error {
+	if len(data) < 9 {
+		return fmt.Errorf("VehicleEnterPacket: insufficient data, got %d bytes, expected 9", len(data))
+	}
+
+	// Read PlayerID (4 bytes)
+	p.PlayerID = types.PlayerID(binary.LittleEndian.Uint32(data[0:4]))
+
+	// Read VehicleID (4 bytes)
+	p.VehicleID = int32(binary.LittleEndian.Uint32(data[4:8]))
+
+	// Unpack bitfields from single byte
+	bitfield := data[8]
+	p.SeatID = bitfield & 0x07           // Extract bits 0-2 for seatid
+	p.Force = (bitfield & 0x08) != 0     // Extract bit 3 for force
+	p.Passenger = (bitfield & 0x10) != 0 // Extract bit 4 for passenger
+
+	return nil
+}
+
 // NewVehicleSpawnPacket creates a new vehicle spawn packet
 func NewVehicleSpawnPacket(vehicleID int32, tempID uint8, modelID uint16, pos types.Vector3, rot float32, color1, color2, createdBy uint8) *VehicleSpawnPacket {
 	return &VehicleSpawnPacket{
@@ -205,5 +264,16 @@ func NewVehicleDriverUpdatePacket(playerID types.PlayerID, vehicleID int32, pos,
 		MiscComponentAngle: miscComponentAngle,
 		PlaneGearState:     planeGearState,
 		Locked:             locked,
+	}
+}
+
+// NewVehicleEnterPacket creates a new vehicle enter packet
+func NewVehicleEnterPacket(playerID types.PlayerID, vehicleID int32, seatID uint8, force, passenger bool) *VehicleEnterPacket {
+	return &VehicleEnterPacket{
+		PlayerID:  playerID,
+		VehicleID: vehicleID,
+		SeatID:    seatID,
+		Force:     force,
+		Passenger: passenger,
 	}
 }

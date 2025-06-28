@@ -377,3 +377,92 @@ func (s *Server) handleVehicleDriverUpdate(client *network.Client, data []byte) 
 
 	return nil
 }
+
+// handleVehicleEnter handles VEHICLE_ENTER packets
+func (s *Server) handleVehicleEnter(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.Addr.String())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.Addr)
+	}
+
+	// Parse the packet
+	var packet packets.VehicleEnterPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal VehicleEnter packet: %w", err)
+	}
+
+	// Set the player ID (clients send 0, server assigns the actual ID)
+	packet.PlayerID = player.ID
+
+	s.logger.Debug().
+		Int32("vehicleID", packet.VehicleID).
+		Int32("playerID", int32(packet.PlayerID)).
+		Str("player", player.Name).
+		Uint8("seatID", packet.SeatID).
+		Bool("force", packet.Force).
+		Bool("passenger", packet.Passenger).
+		Msg("Received vehicle enter request")
+
+	// Get the vehicle
+	vehicle := s.vehicleManager.GetVehicle(types.VehicleID(packet.VehicleID))
+	if vehicle == nil {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("player", player.Name).
+			Msg("Vehicle not found for enter request")
+		return nil // Not an error - vehicle might have been removed
+	}
+
+	// Validate seat ID (0 = driver, 1-3 = passengers)
+	if packet.SeatID > 3 {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("player", player.Name).
+			Uint8("seatID", packet.SeatID).
+			Msg("Invalid seat ID for vehicle enter")
+		return nil
+	}
+
+	// Check if player is trying to enter as driver (seat 0)
+	if packet.SeatID == 0 && !packet.Passenger {
+		// Player wants to drive
+		if vehicle.Driver != nil && vehicle.Driver != player {
+			s.logger.Warn().
+				Int32("vehicleID", packet.VehicleID).
+				Str("player", player.Name).
+				Str("currentDriver", vehicle.Driver.Name).
+				Msg("Vehicle already has a driver")
+			return nil // Vehicle already has a driver
+		}
+		vehicle.Driver = player
+		vehicle.Syncer = player // Driver becomes syncer
+	}
+
+	s.logger.Info().
+		Int32("vehicleID", packet.VehicleID).
+		Str("player", player.Name).
+		Uint8("seatID", packet.SeatID).
+		Bool("isDriver", packet.SeatID == 0 && !packet.Passenger).
+		Bool("force", packet.Force).
+		Msg("Player entering vehicle")
+
+	// Broadcast the enter request to all other clients (reliable packet)
+	// This matches the C++ logic: CNetwork::SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal vehicle enter packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.VEHICLE_ENTER,
+		Data: packetData,
+		Flag: network.PacketFlagReliable, // Reliable for important vehicle state changes
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast vehicle enter: %w", err)
+	}
+
+	return nil
+}
