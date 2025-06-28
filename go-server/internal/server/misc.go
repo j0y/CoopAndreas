@@ -290,3 +290,51 @@ func (s *Server) handlePlayMissionAudio(client *network.Client, data []byte) err
 
 	return nil
 }
+
+// handleAddExplosion handles ADD_EXPLOSION packets
+// This matches the C++ CPlayerPackets::AddExplosion::Handle() functionality
+// Simply rebroadcasts the explosion to all other clients
+func (s *Server) handleAddExplosion(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.AddExplosionPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal AddExplosion packet: %w", err)
+	}
+
+	s.logger.Debug().
+		Str("player", player.Name).
+		Uint8("explosionType", packet.Type).
+		Float32("x", packet.Position.X).
+		Float32("y", packet.Position.Y).
+		Float32("z", packet.Position.Z).
+		Int32("time", packet.Time).
+		Bool("usesSound", packet.UsesSound).
+		Float32("cameraShake", packet.CameraShake).
+		Bool("isVisible", packet.IsVisible).
+		Msg("Player created explosion")
+
+	// Broadcast to all other clients (reliable packet)
+	// This matches the C++ logic: SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal AddExplosion packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.ADD_EXPLOSION,
+		Data: packetData,
+		Flag: network.PacketFlagReliable, // Reliable for important explosion events
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast explosion: %w", err)
+	}
+
+	return nil
+}

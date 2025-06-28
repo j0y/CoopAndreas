@@ -340,3 +340,80 @@ func NewPlayMissionAudioPacket(slotID uint8, audioID int32) *PlayMissionAudioPac
 		AudioID: audioID,
 	}
 }
+
+// AddExplosionPacket represents an explosion event
+// This matches the C++ CPackets::AddExplosion structure exactly
+type AddExplosionPacket struct {
+	Type        uint8         // Explosion type (eExplosionType enum)
+	Position    types.Vector3 // Explosion position
+	Time        int32         // Time parameter
+	UsesSound   bool          // Whether explosion uses sound
+	CameraShake float32       // Camera shake intensity
+	IsVisible   bool          // Whether explosion is visible
+}
+
+// Marshal serializes the packet to binary format with C++ struct packing
+func (p *AddExplosionPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	// Write each field manually to ensure exact C++ struct layout
+	if err := binary.Write(buf, binary.LittleEndian, p.Type); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.Position); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.Time); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.UsesSound); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.CameraShake); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.IsVisible); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes binary data to packet with C++ struct packing
+func (p *AddExplosionPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+
+	// Read each field manually to ensure exact C++ struct layout
+	if err := binary.Read(buf, binary.LittleEndian, &p.Type); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.Position); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.Time); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.UsesSound); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.CameraShake); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.IsVisible); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// NewAddExplosionPacket creates a new add explosion packet
+func NewAddExplosionPacket(explosionType uint8, position types.Vector3, time int32, usesSound bool, cameraShake float32, isVisible bool) *AddExplosionPacket {
+	return &AddExplosionPacket{
+		Type:        explosionType,
+		Position:    position,
+		Time:        time,
+		UsesSound:   usesSound,
+		CameraShake: cameraShake,
+		IsVisible:   isVisible,
+	}
+}
