@@ -29,6 +29,7 @@ type Vehicle struct {
 	Occupants          [8]*Player      // Vehicle occupants (index 0 = driver, 1-7 = passengers)
 	Syncer             *Player         // Player responsible for syncing this vehicle
 	CreatedBy          uint8           // Who created this vehicle
+	DamageManager      [23]byte        // Damage manager data (23 bytes like C++ server)
 	Active             bool            // Whether the vehicle is active
 }
 

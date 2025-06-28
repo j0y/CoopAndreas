@@ -126,6 +126,44 @@ func (s *Server) sendExistingVehiclesTo(client *network.Client) {
 			s.logger.Error().Err(err).Msg("Failed to send existing vehicle packet")
 		}
 
+		// Check if vehicle has damage data (matching C++ logic)
+		modifiedDamageStatus := false
+		for _, damage := range vehicle.DamageManager {
+			if damage != 0 {
+				modifiedDamageStatus = true
+				break
+			}
+		}
+
+		// Send damage data if vehicle has been damaged (matching C++ logic)
+		if modifiedDamageStatus {
+			vehicleDamagePacket := packets.VehicleDamagePacket{
+				VehicleID:     int32(vehicle.ID),
+				DamageManager: vehicle.DamageManager,
+			}
+
+			damageData, err := vehicleDamagePacket.Marshal()
+			if err != nil {
+				s.logger.Error().Err(err).Msg("Failed to marshal vehicle damage packet")
+				continue
+			}
+
+			damageNetworkPacket := &network.NetworkPacket{
+				ID:   types.VEHICLE_DAMAGE,
+				Data: damageData,
+				Flag: network.PacketFlagReliable,
+			}
+
+			if err := s.networkServer.SendPacket(client, damageNetworkPacket); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send vehicle damage packet")
+			}
+
+			s.logger.Debug().
+				Int32("vehicleID", int32(vehicle.ID)).
+				Uint32("clientID", client.ID).
+				Msg("Sent vehicle damage data to new player")
+		}
+
 		s.logger.Debug().
 			Int32("vehicleID", int32(vehicle.ID)).
 			Uint32("clientID", client.ID).
@@ -614,6 +652,52 @@ func (s *Server) handleVehiclePassengerUpdate(client *network.Client, data []byt
 
 	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
 		return fmt.Errorf("failed to broadcast vehicle passenger update: %w", err)
+	}
+
+	return nil
+}
+
+// handleVehicleDamage handles VEHICLE_DAMAGE packets
+func (s *Server) handleVehicleDamage(client *network.Client, data []byte) error {
+	// Parse the packet
+	var packet packets.VehicleDamagePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal VehicleDamage packet: %w", err)
+	}
+
+	// Get the vehicle
+	vehicle := s.vehicleManager.GetVehicle(types.VehicleID(packet.VehicleID))
+	if vehicle == nil {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("client", client.GetClientID()).
+			Msg("Vehicle damage packet for non-existent vehicle")
+		return nil // Ignore damage packets for non-existent vehicles
+	}
+
+	// Store the damage manager data (matching C++ logic)
+	copy(vehicle.DamageManager[:], packet.DamageManager[:])
+
+	s.logger.Debug().
+		Int32("vehicleID", packet.VehicleID).
+		Str("client", client.GetClientID()).
+		Msg("Vehicle damage updated")
+
+	// Broadcast to all other clients (reliable packet)
+	// This matches C++ logic: SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal vehicle damage packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.VEHICLE_DAMAGE,
+		Data: packetData,
+		Flag: 1, // Reliable for damage updates (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast vehicle damage: %w", err)
 	}
 
 	return nil

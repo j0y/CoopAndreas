@@ -87,6 +87,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleVehicleEnter(client, packet.Data)
 	case types.VEHICLE_EXIT:
 		return s.handleVehicleExit(client, packet.Data)
+	case types.VEHICLE_DAMAGE:
+		return s.handleVehicleDamage(client, packet.Data)
 	case types.VEHICLE_PASSENGER_UPDATE:
 		return s.handleVehiclePassengerUpdate(client, packet.Data)
 	case types.GAME_WEATHER_TIME:

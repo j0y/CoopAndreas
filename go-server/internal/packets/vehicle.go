@@ -273,6 +273,26 @@ func (p *VehiclePassengerUpdatePacket) Unmarshal(data []byte) error {
 	return binary.Read(buf, binary.LittleEndian, p)
 }
 
+// VehicleDamagePacket represents vehicle damage information
+// This matches the C++ CVehiclePackets::VehicleDamage structure exactly
+type VehicleDamagePacket struct {
+	VehicleID     int32    // Vehicle ID (matches C++ int vehicleid)
+	DamageManager [23]byte // Damage manager data (matches C++ unsigned char damageManager_padding[23])
+}
+
+// Marshal serializes the packet to binary format
+func (p *VehicleDamagePacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *VehicleDamagePacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
 // NewVehicleSpawnPacket creates a new vehicle spawn packet
 func NewVehicleSpawnPacket(vehicleID int32, tempID uint8, modelID uint16, pos types.Vector3, rot float32, color1, color2, createdBy uint8) *VehicleSpawnPacket {
 	return &VehicleSpawnPacket{
@@ -374,5 +394,13 @@ func NewVehiclePassengerUpdatePacket(playerID types.PlayerID, vehicleID int32, h
 		Ammo:         ammo,
 		Driveby:      driveby,
 		SeatID:       seatID,
+	}
+}
+
+// NewVehicleDamagePacket creates a new vehicle damage packet
+func NewVehicleDamagePacket(vehicleID int32, damageManager [23]byte) *VehicleDamagePacket {
+	return &VehicleDamagePacket{
+		VehicleID:     vehicleID,
+		DamageManager: damageManager,
 	}
 }
