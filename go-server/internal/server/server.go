@@ -62,6 +62,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleVehicleSpawn(client, packet.Data)
 	case types.VEHICLE_REMOVE:
 		return s.handleVehicleRemove(client, packet.Data)
+	case types.VEHICLE_IDLE_UPDATE:
+		return s.handleVehicleIdleUpdate(client, packet.Data)
 	case types.MASS_PACKET_SEQUENCE:
 		return s.handleMassPacketSequence(client, packet.Data)
 	default:

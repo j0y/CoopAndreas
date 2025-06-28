@@ -201,3 +201,80 @@ func (s *Server) handleVehicleRemove(client *network.Client, data []byte) error 
 
 	return nil
 }
+
+// handleVehicleIdleUpdate handles VEHICLE_IDLE_UPDATE packets
+func (s *Server) handleVehicleIdleUpdate(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.Addr.String())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.Addr)
+	}
+
+	// Parse the packet
+	var packet packets.VehicleIdleUpdatePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal VehicleIdleUpdate packet: %w", err)
+	}
+
+	s.logger.Debug().
+		Int32("vehicleID", packet.VehicleID).
+		Str("player", player.Name).
+		Float32("x", packet.Position.X).
+		Float32("y", packet.Position.Y).
+		Float32("z", packet.Position.Z).
+		Float32("health", packet.Health).
+		Msg("Received vehicle idle update")
+
+	// Get the vehicle
+	vehicle := s.vehicleManager.GetVehicle(types.VehicleID(packet.VehicleID))
+	if vehicle == nil {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("player", player.Name).
+			Msg("Vehicle not found for idle update")
+		return nil // Not an error - vehicle might have been removed
+	}
+
+	// Check if the player is authorized to update this vehicle
+	// Only the syncer (controller) can send idle updates
+	if vehicle.Syncer != player {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("player", player.Name).
+			Str("syncer", vehicle.Syncer.Name).
+			Msg("Player attempted to send idle update for vehicle they don't control")
+		return nil // Ignore unauthorized updates
+	}
+
+	// Update the vehicle's state (matching C++ logic)
+	vehicle.Position = packet.Position
+	vehicle.FullRotation = packet.Rotation // Use FullRotation for 3D rotation
+	vehicle.Roll = packet.Roll
+	vehicle.Velocity = packet.Velocity
+	vehicle.TurnSpeed = packet.TurnSpeed
+	vehicle.PrimaryColor = packet.Color1
+	vehicle.SecondaryColor = packet.Color2
+	vehicle.Health = packet.Health
+	vehicle.Paintjob = packet.Paintjob
+	vehicle.PlaneGearState = packet.PlaneGearState
+	vehicle.Locked = packet.Locked
+
+	// Broadcast the update to all other clients (unreliable packet for frequent updates)
+	// This matches the C++ logic: CNetwork::SendPacketToAll with ENetPacketFlag 0 (unreliable)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal vehicle idle update packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.VEHICLE_IDLE_UPDATE,
+		Data: packetData,
+		Flag: 0, // Unreliable for frequent position/state updates
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast vehicle idle update: %w", err)
+	}
+
+	return nil
+}
