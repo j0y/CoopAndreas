@@ -395,6 +395,7 @@ func (s *Server) BroadcastPacket(packet *NetworkPacket) {
 		if err := s.SendPacket(client, packet); err != nil {
 			s.logger.Error().
 				Err(err).
+				Uint32("clientID", client.ID).
 				Str("client", client.Addr.String()).
 				Msg("Failed to broadcast packet to client")
 		}
@@ -407,10 +408,11 @@ func (s *Server) BroadcastPacketExclude(packet *NetworkPacket, excludeClient *Cl
 	defer s.clientsMutex.RUnlock()
 
 	for _, client := range s.clients {
-		if client.Addr.String() != excludeClient.Addr.String() {
+		if client.ID != excludeClient.ID {
 			if err := s.SendPacket(client, packet); err != nil {
 				s.logger.Error().
 					Err(err).
+					Uint32("clientID", client.ID).
 					Str("client", client.Addr.String()).
 					Msg("Failed to broadcast packet to client")
 			}
