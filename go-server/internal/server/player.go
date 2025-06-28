@@ -112,14 +112,14 @@ func (s *Server) handlePlayerOnFoot(client *network.Client, data []byte) error {
 		return fmt.Errorf("failed to broadcast player onfoot: %w", err)
 	}
 
-	s.logger.Debug().
-		Str("player", player.Name).
-		Float32("x", packet.Position.X).
-		Float32("y", packet.Position.Y).
-		Float32("z", packet.Position.Z).
-		Uint8("health", packet.Health).
-		Uint8("weapon", packet.Weapon).
-		Msg("Player onfoot update")
+	//s.logger.Debug().
+	//	Str("player", player.Name).
+	//	Float32("x", packet.Position.X).
+	//	Float32("y", packet.Position.Y).
+	//	Float32("z", packet.Position.Z).
+	//	Uint8("health", packet.Health).
+	//	Uint8("weapon", packet.Weapon).
+	//	Msg("Player onfoot update")
 
 	return nil
 }
