@@ -247,6 +247,32 @@ func (p *VehicleExitPacket) Unmarshal(data []byte) error {
 	return nil
 }
 
+// VehiclePassengerUpdate represents a passenger update in a vehicle
+// This matches the C++ CVehiclePackets::VehiclePassengerUpdate structure exactly
+type VehiclePassengerUpdatePacket struct {
+	PlayerID     int32  // Player ID (set by server)
+	VehicleID    int32  // Vehicle ID
+	PlayerHealth uint8  // Player health (0-255)
+	PlayerArmour uint8  // Player armour (0-255)
+	Weapon       uint8  // Current weapon ID
+	Ammo         uint16 // Current weapon ammo
+	Driveby      uint8  // Whether player is in driveby mode (0/1)
+	SeatID       uint8  // Seat ID (passenger seat number)
+}
+
+// Marshal serializes the packet to binary format
+func (p *VehiclePassengerUpdatePacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *VehiclePassengerUpdatePacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
 // NewVehicleSpawnPacket creates a new vehicle spawn packet
 func NewVehicleSpawnPacket(vehicleID int32, tempID uint8, modelID uint16, pos types.Vector3, rot float32, color1, color2, createdBy uint8) *VehicleSpawnPacket {
 	return &VehicleSpawnPacket{
@@ -334,5 +360,19 @@ func NewVehicleExitPacket(playerID types.PlayerID, force bool) *VehicleExitPacke
 	return &VehicleExitPacket{
 		PlayerID: playerID,
 		Force:    force,
+	}
+}
+
+// NewVehiclePassengerUpdatePacket creates a new vehicle passenger update packet
+func NewVehiclePassengerUpdatePacket(playerID types.PlayerID, vehicleID int32, health, armour, weapon uint8, ammo uint16, driveby, seatID uint8) *VehiclePassengerUpdatePacket {
+	return &VehiclePassengerUpdatePacket{
+		PlayerID:     int32(playerID),
+		VehicleID:    vehicleID,
+		PlayerHealth: health,
+		PlayerArmour: armour,
+		Weapon:       weapon,
+		Ammo:         ammo,
+		Driveby:      driveby,
+		SeatID:       seatID,
 	}
 }

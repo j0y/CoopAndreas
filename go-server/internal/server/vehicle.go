@@ -540,3 +540,81 @@ func (s *Server) handleVehicleExit(client *network.Client, data []byte) error {
 
 	return nil
 }
+
+// handleVehiclePassengerUpdate handles VEHICLE_PASSENGER_UPDATE packets
+// This matches the C++ CVehiclePackets::VehiclePassengerUpdate::Handle() functionality
+func (s *Server) handleVehiclePassengerUpdate(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.VehiclePassengerUpdatePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal VehiclePassengerUpdate packet: %w", err)
+	}
+
+	// Set the player ID (security measure - don't trust client, matching C++ logic)
+	packet.PlayerID = int32(player.ID)
+
+	// Validate weapon (matching C++ logic: 0-18 or 22-46 are valid)
+	isValidWeapon := packet.Weapon <= 18 || (packet.Weapon >= 22 && packet.Weapon <= 46)
+	if !isValidWeapon {
+		packet.Weapon = 0
+		packet.Ammo = 0
+	}
+
+	// Get the vehicle entity
+	vehicle := s.vehicleManager.GetVehicle(types.VehicleID(packet.VehicleID))
+	if vehicle != nil {
+		// Set the player as occupant of the specified seat (seat ID + 1 for driver/passenger indexing)
+		// This matches the C++ logic: vehicle->SetOccupant(packet->seatid + 1, player)
+		vehicle.SetOccupant(int(packet.SeatID)+1, player)
+
+		// If there's no driver (seat 0), try to reassign syncer to a passenger
+		// This matches the C++ logic for reassigning syncer when driver leaves
+		if vehicle.GetOccupant(0) == nil {
+			for i := 1; i < 8; i++ { // Check passenger seats
+				if occupant := vehicle.GetOccupant(i); occupant != nil {
+					vehicle.Syncer = occupant
+					s.logger.Debug().
+						Int32("vehicleID", int32(vehicle.ID)).
+						Int32("newSyncerID", int32(occupant.ID)).
+						Str("newSyncerName", occupant.Name).
+						Msg("Reassigned vehicle syncer to passenger")
+					break
+				}
+			}
+		}
+	}
+
+	s.logger.Debug().
+		Str("player", player.Name).
+		Int32("vehicleID", packet.VehicleID).
+		Uint8("seatID", packet.SeatID).
+		Uint8("health", packet.PlayerHealth).
+		Uint8("weapon", packet.Weapon).
+		Uint8("driveby", packet.Driveby).
+		Msg("Vehicle passenger update")
+
+	// Broadcast to all other clients (unreliable packet, frequent updates)
+	// This matches the C++ logic: SendPacketToAll with (ENetPacketFlag)0 (unreliable)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal vehicle passenger update packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.VEHICLE_PASSENGER_UPDATE,
+		Data: packetData,
+		Flag: 0, // Unreliable for frequent passenger updates (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast vehicle passenger update: %w", err)
+	}
+
+	return nil
+}

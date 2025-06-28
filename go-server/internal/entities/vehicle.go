@@ -26,6 +26,7 @@ type Vehicle struct {
 	BikeLean           float32         // Bike lean angle (for bikes/bmx)
 	MiscComponentAngle uint16          // Misc component angle (e.g., hydra thrusters)
 	Driver             *Player         // Current driver (nil if no driver)
+	Occupants          [8]*Player      // Vehicle occupants (index 0 = driver, 1-7 = passengers)
 	Syncer             *Player         // Player responsible for syncing this vehicle
 	CreatedBy          uint8           // Who created this vehicle
 	Active             bool            // Whether the vehicle is active
@@ -184,4 +185,52 @@ func NewVehicle(id types.VehicleID, modelID uint16, pos types.Vector3, rot float
 func IsValidVehicleModel(modelID uint16) bool {
 	// In GTA San Andreas, vehicle models are from 400 to 611
 	return modelID >= 400 && modelID <= 611
+}
+
+// SetOccupant sets a player as occupant of a specific seat
+// seatID: 0 = driver, 1-7 = passengers
+func (v *Vehicle) SetOccupant(seatID int, player *Player) {
+	if seatID < 0 || seatID >= len(v.Occupants) {
+		return // Invalid seat ID
+	}
+
+	v.Occupants[seatID] = player
+
+	// Update Driver field for backward compatibility
+	if seatID == 0 {
+		v.Driver = player
+	}
+}
+
+// GetOccupant gets the player occupying a specific seat
+// seatID: 0 = driver, 1-7 = passengers
+func (v *Vehicle) GetOccupant(seatID int) *Player {
+	if seatID < 0 || seatID >= len(v.Occupants) {
+		return nil // Invalid seat ID
+	}
+
+	return v.Occupants[seatID]
+}
+
+// RemoveOccupant removes a player from a specific seat
+func (v *Vehicle) RemoveOccupant(seatID int) {
+	if seatID < 0 || seatID >= len(v.Occupants) {
+		return // Invalid seat ID
+	}
+
+	v.Occupants[seatID] = nil
+
+	// Update Driver field for backward compatibility
+	if seatID == 0 {
+		v.Driver = nil
+	}
+}
+
+// RemovePlayerFromVehicle removes a player from any seat they occupy
+func (v *Vehicle) RemovePlayerFromVehicle(player *Player) {
+	for i, occupant := range v.Occupants {
+		if occupant == player {
+			v.RemoveOccupant(i)
+		}
+	}
 }
