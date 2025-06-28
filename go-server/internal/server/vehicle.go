@@ -128,7 +128,7 @@ func (s *Server) sendExistingVehiclesTo(client *network.Client) {
 
 		s.logger.Debug().
 			Int32("vehicleID", int32(vehicle.ID)).
-			Str("client", client.Addr.String()).
+			Uint32("clientID", client.ID).
 			Msg("Sent existing vehicle info to new player")
 	}
 }

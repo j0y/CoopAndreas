@@ -396,7 +396,6 @@ func (s *Server) BroadcastPacket(packet *NetworkPacket) {
 			s.logger.Error().
 				Err(err).
 				Uint32("clientID", client.ID).
-				Str("client", client.Addr.String()).
 				Msg("Failed to broadcast packet to client")
 		}
 	}
@@ -413,7 +412,6 @@ func (s *Server) BroadcastPacketExclude(packet *NetworkPacket, excludeClient *Cl
 				s.logger.Error().
 					Err(err).
 					Uint32("clientID", client.ID).
-					Str("client", client.Addr.String()).
 					Msg("Failed to broadcast packet to client")
 			}
 		}

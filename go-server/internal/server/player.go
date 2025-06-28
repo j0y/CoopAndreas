@@ -25,7 +25,7 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 	player := s.playerManager.GetPlayer(client.GetClientID())
 	if player == nil {
 		s.logger.Warn().
-			Str("client", client.Addr.String()).
+			Uint32("clientID", client.ID).
 			Str("name", playerName).
 			Msg("Received name from unknown player")
 		return fmt.Errorf("no player found for client %s", client.Addr)
@@ -36,7 +36,7 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 	player.Name = playerName
 
 	s.logger.Info().
-		Str("client", client.Addr.String()).
+		Uint32("clientID", client.ID).
 		Str("oldName", oldName).
 		Str("newName", playerName).
 		Int32("playerID", int32(player.ID)).
@@ -145,7 +145,7 @@ func (s *Server) handlePlayerKeySync(client *network.Client, data []byte) error 
 			Err(err).
 			Int("dataSize", len(data)).
 			Str("dataHex", fmt.Sprintf("%x", data)).
-			Str("client", client.Addr.String()).
+			Uint32("clientID", client.ID).
 			Msg("Failed to unmarshal PLAYER_KEY_SYNC packet")
 		return fmt.Errorf("failed to unmarshal PlayerKeySync packet: %w", err)
 	}
@@ -351,7 +351,7 @@ func (s *Server) sendHandshakeTo(client *network.Client, handshakePacket *packet
 
 	s.logger.Info().
 		Int32("playerID", int32(handshakePacket.YourID)).
-		Str("client", client.Addr.String()).
+		Uint32("clientID", client.ID).
 		Msg("Sent handshake packet to new player")
 }
 
@@ -367,7 +367,7 @@ func (s *Server) handlePlayerSetHost(client *network.Client, data []byte) error 
 
 	s.logger.Info().
 		Int32("hostPlayerID", int32(packet.ID)).
-		Str("client", client.Addr.String()).
+		Uint32("clientID", client.ID).
 		Msg("Received PlayerSetHost packet (unusual - typically server-to-client)")
 
 	// Note: In the C++ implementation, this packet is typically sent FROM server TO clients

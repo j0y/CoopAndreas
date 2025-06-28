@@ -25,7 +25,7 @@ func (s *Server) handleCheckVersion(client *network.Client, data []byte) error {
 	clientVersionStr = strings.TrimSpace(clientVersionStr)
 
 	s.logger.Info().
-		Str("client", client.Addr.String()).
+		Uint32("clientID", client.ID).
 		Str("clientVersion", clientVersionStr).
 		Uint32("protocolVersion", packet.ProtocolVersion).
 		Msg("Version check request received")
@@ -35,7 +35,7 @@ func (s *Server) handleCheckVersion(client *network.Client, data []byte) error {
 	if err != nil {
 		s.logger.Error().
 			Err(err).
-			Str("client", client.Addr.String()).
+			Uint32("clientID", client.ID).
 			Str("clientVersion", clientVersionStr).
 			Msg("Failed to validate client version")
 
@@ -49,13 +49,13 @@ func (s *Server) handleCheckVersion(client *network.Client, data []byte) error {
 	if isCompatible {
 		responseMessage = "Welcome to CoopAndreas Server!"
 		s.logger.Info().
-			Str("client", client.Addr.String()).
+			Uint32("clientID", client.ID).
 			Str("clientVersion", clientVersionStr).
 			Msg("Client version accepted")
 	} else {
 		responseMessage = message
 		s.logger.Warn().
-			Str("client", client.Addr.String()).
+			Uint32("clientID", client.ID).
 			Str("clientVersion", clientVersionStr).
 			Str("reason", message).
 			Msg("Client version rejected")
@@ -82,7 +82,7 @@ func (s *Server) handleCheckVersion(client *network.Client, data []byte) error {
 	// For now, we'll let them stay connected but log the incompatibility
 	if !isCompatible {
 		s.logger.Info().
-			Str("client", client.Addr.String()).
+			Uint32("clientID", client.ID).
 			Msg("Client with incompatible version remains connected (warning only)")
 	}
 

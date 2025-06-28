@@ -92,7 +92,7 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 	default:
 		s.logger.Debug().
 			Uint16("packetID", uint16(packet.ID)).
-			Str("client", client.Addr.String()).
+			Uint32("clientID", client.ID).
 			Msg("Unhandled packet type")
 		return nil
 	}

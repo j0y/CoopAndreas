@@ -304,7 +304,7 @@ func (s *Server) sendExistingPedsTo(client *network.Client) {
 
 		s.logger.Debug().
 			Int32("pedID", int32(ped.ID)).
-			Str("client", client.Addr.String()).
+			Uint32("clientID", client.ID).
 			Msg("Sent existing ped info to new player")
 	}
 }
