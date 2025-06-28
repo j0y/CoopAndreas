@@ -77,6 +77,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleVehicleExit(client, packet.Data)
 	case types.GAME_WEATHER_TIME:
 		return s.handleGameWeatherTime(client, packet.Data)
+	case types.OPCODE_SYNC:
+		return s.handleOpCodeSync(client, packet.Data)
 	case types.MASS_PACKET_SEQUENCE:
 		return s.handleMassPacketSequence(client, packet.Data)
 	default:

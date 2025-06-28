@@ -9,7 +9,7 @@ import (
 )
 
 // handleMassPacketSequence handles MASS_PACKET_SEQUENCE packets
-// Based on C++ server logic: simply rebroadcast the entire mass packet to all other clients
+// Based on C++ server logic: simply rebroadcasts the entire mass packet to all other clients
 // This matches the C++ implementation in CNetwork::HandlePacketReceive
 func (s *Server) handleMassPacketSequence(client *network.Client, data []byte) error {
 	// In C++: CNetwork::SendPacketRawToAll(event.packet->data, event.packet->dataLength, (ENetPacketFlag)event.packet->flags, event.peer);
@@ -160,6 +160,57 @@ func (s *Server) broadcastCurrentWeatherTime() error {
 		Uint8("currentHour", s.currentWeatherTime.CurrentHour).
 		Uint8("currentMinute", s.currentWeatherTime.CurrentMinute).
 		Msg("Broadcasted current weather/time to all clients")
+
+	return nil
+}
+
+// handleOpCodeSync handles OPCODE_SYNC packets
+// This matches the C++ CPlayerPackets::OpCodeSync::Handle() functionality
+// Only the host player can send opcode synchronization packets
+func (s *Server) handleOpCodeSync(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (!CPlayerManager::GetPlayer(peer)->m_bIsHost) return;)
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Int32("playerID", int32(player.ID)).
+			Msg("Non-host player attempted to send opcode sync")
+		return nil // Ignore non-host opcode sync
+	}
+
+	// Parse the packet to validate structure (optional but good for debugging)
+	var packet packets.OpcodeSyncPacket
+	if err := packet.Unmarshal(data); err != nil {
+		s.logger.Warn().
+			Err(err).
+			Str("hostPlayer", player.Name).
+			Msg("Failed to parse opcode sync packet")
+		// Still rebroadcast the raw data even if parsing fails, to match C++ behavior
+	} else {
+		s.logger.Debug().
+			Str("hostPlayer", player.Name).
+			Uint16("opcode", packet.Opcode).
+			Uint8("intParams", packet.IntParamCount).
+			Uint8("stringParams", packet.StringParamCount).
+			Msg("Host sent opcode sync")
+	}
+
+	// Rebroadcast raw data to all clients except the sender (matching C++ logic)
+	// This matches: CNetwork::SendPacketToAll(CPacketsID::OPCODE_SYNC, data, size, ENET_PACKET_FLAG_RELIABLE, peer);
+	networkPacket := &network.NetworkPacket{
+		ID:   types.OPCODE_SYNC,
+		Data: data,                       // Send raw data as received
+		Flag: network.PacketFlagReliable, // Reliable for script synchronization
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast opcode sync: %w", err)
+	}
 
 	return nil
 }
