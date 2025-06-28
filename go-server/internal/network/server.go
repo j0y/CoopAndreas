@@ -316,10 +316,10 @@ func (s *Server) handleReceive(event enet.Event) {
 		return
 	}
 
-	s.logger.Debug().
-		Uint16("packetID", uint16(gamePacket.ID)).
-		Uint32("clientID", clientID).
-		Msg("Received ENet packet")
+	//s.logger.Debug().
+	//	Uint16("packetID", uint16(gamePacket.ID)).
+	//	Uint32("clientID", clientID).
+	//	Msg("Received ENet packet")
 
 	// Handle the packet
 	if err := s.gameServer.HandlePacket(client, gamePacket); err != nil {
