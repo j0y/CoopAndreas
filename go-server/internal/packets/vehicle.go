@@ -196,6 +196,57 @@ func (p *VehicleEnterPacket) Unmarshal(data []byte) error {
 	return nil
 }
 
+// VehicleExitPacket represents a player exiting a vehicle
+// This matches the C++ CVehiclePackets::VehicleExit structure exactly
+type VehicleExitPacket struct {
+	PlayerID types.PlayerID // Player ID exiting the vehicle (matches C++ int playerid)
+	Force    bool           // Whether exit is forced (matches C++ bool force)
+}
+
+// Marshal serializes the packet to binary format
+func (p *VehicleExitPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	// Write PlayerID (4 bytes)
+	if err := binary.Write(buf, binary.LittleEndian, p.PlayerID); err != nil {
+		return nil, err
+	}
+
+	// Write Force as byte (1 byte, matching C++ bool)
+	var forceByte uint8
+	if p.Force {
+		forceByte = 1
+	}
+	if err := binary.Write(buf, binary.LittleEndian, forceByte); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *VehicleExitPacket) Unmarshal(data []byte) error {
+	if len(data) < 5 { // 4 bytes PlayerID + 1 byte Force
+		return fmt.Errorf("VehicleExitPacket: insufficient data, got %d bytes, expected 5", len(data))
+	}
+
+	buf := bytes.NewReader(data)
+
+	// Read PlayerID (4 bytes)
+	if err := binary.Read(buf, binary.LittleEndian, &p.PlayerID); err != nil {
+		return err
+	}
+
+	// Read Force as byte (1 byte)
+	var forceByte uint8
+	if err := binary.Read(buf, binary.LittleEndian, &forceByte); err != nil {
+		return err
+	}
+	p.Force = forceByte != 0
+
+	return nil
+}
+
 // NewVehicleSpawnPacket creates a new vehicle spawn packet
 func NewVehicleSpawnPacket(vehicleID int32, tempID uint8, modelID uint16, pos types.Vector3, rot float32, color1, color2, createdBy uint8) *VehicleSpawnPacket {
 	return &VehicleSpawnPacket{
@@ -275,5 +326,13 @@ func NewVehicleEnterPacket(playerID types.PlayerID, vehicleID int32, seatID uint
 		SeatID:    seatID,
 		Force:     force,
 		Passenger: passenger,
+	}
+}
+
+// NewVehicleExitPacket creates a new vehicle exit packet
+func NewVehicleExitPacket(playerID types.PlayerID, force bool) *VehicleExitPacket {
+	return &VehicleExitPacket{
+		PlayerID: playerID,
+		Force:    force,
 	}
 }

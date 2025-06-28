@@ -466,3 +466,77 @@ func (s *Server) handleVehicleEnter(client *network.Client, data []byte) error {
 
 	return nil
 }
+
+// handleVehicleExit handles VEHICLE_EXIT packets
+func (s *Server) handleVehicleExit(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.VehicleExitPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal VehicleExit packet: %w", err)
+	}
+
+	// Set the player ID (security measure - don't trust client, matching C++ logic)
+	packet.PlayerID = player.ID
+
+	s.logger.Debug().
+		Int32("playerID", int32(packet.PlayerID)).
+		Str("player", player.Name).
+		Bool("force", packet.Force).
+		Msg("Received vehicle exit request")
+
+	// Find the vehicle the player is currently in
+	// We need to iterate through vehicles to find which one this player is driving
+	// This matches the C++ logic where they check player->m_pPed->m_pVehicle
+	var currentVehicle *entities.Vehicle
+	for _, vehicle := range s.vehicleManager.GetAllVehicles() {
+		if vehicle.Driver != nil && vehicle.Driver.ID == player.ID {
+			currentVehicle = vehicle
+			break
+		}
+	}
+
+	if currentVehicle == nil {
+		s.logger.Debug().
+			Str("player", player.Name).
+			Msg("Player not in any vehicle - ignoring exit request")
+		return nil // Player is not in a vehicle, ignore the request
+	}
+
+	s.logger.Info().
+		Int32("vehicleID", int32(currentVehicle.ID)).
+		Str("player", player.Name).
+		Bool("force", packet.Force).
+		Msg("Player exiting vehicle")
+
+	// Update vehicle occupancy state - clear driver if this player was driving
+	if currentVehicle.Driver != nil && currentVehicle.Driver.ID == player.ID {
+		currentVehicle.Driver = nil
+		// Note: We don't change the syncer here, they may still be responsible for syncing
+		// the vehicle even after exiting (this matches typical multiplayer behavior)
+	}
+
+	// Broadcast the exit packet to all other clients (reliable packet)
+	// This matches the C++ logic: CNetwork::SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal vehicle exit packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.VEHICLE_EXIT,
+		Data: packetData,
+		Flag: network.PacketFlagReliable, // Reliable for important vehicle state changes
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast vehicle exit: %w", err)
+	}
+
+	return nil
+}
