@@ -45,6 +45,13 @@ func (s *Server) HandlePlayerConnect(client *network.Client) {
 	// Send handshake packet to the new player
 	handshakePacket := packets.NewPlayerHandshakePacket(player.ID)
 	s.sendHandshakeTo(client, handshakePacket)
+
+	// Assign host if no current host exists (first player becomes host)
+	if s.playerManager.GetHost() == nil {
+		if err := s.assignHostToFirstPlayer(); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to assign host to first player")
+		}
+	}
 }
 
 // HandlePlayerDisconnect handles when a player disconnects
@@ -59,8 +66,9 @@ func (s *Server) HandlePlayerDisconnect(client *network.Client) {
 		return
 	}
 
-	// Store player ID for broadcasting
+	// Store player info for broadcasting and host checking
 	disconnectedPlayerID := player.ID
+	wasHost := player.IsHost
 
 	// Remove all peds owned by this player
 	removedPeds := s.pedManager.RemoveAllHostedBy(player)
@@ -120,5 +128,13 @@ func (s *Server) HandlePlayerDisconnect(client *network.Client) {
 		Int32("playerID", int32(disconnectedPlayerID)).
 		Int("pedsRemoved", len(removedPeds)).
 		Int("vehiclesRemoved", len(removedVehicles)).
+		Bool("wasHost", wasHost).
 		Msg("Player disconnected")
+
+	// If the disconnected player was the host, assign host to another player
+	if wasHost {
+		if err := s.assignHostToFirstPlayer(); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to reassign host after host disconnection")
+		}
+	}
 }

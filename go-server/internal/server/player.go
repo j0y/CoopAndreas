@@ -267,3 +267,59 @@ func (s *Server) sendHandshakeTo(client *network.Client, handshakePacket *packet
 		Str("client", client.Addr.String()).
 		Msg("Sent handshake packet to new player")
 }
+
+// handlePlayerSetHost handles PLAYER_SET_HOST packets
+// Note: This packet is typically sent FROM server TO clients, not the other way around
+// But we implement the handler for completeness and potential client-to-server scenarios
+func (s *Server) handlePlayerSetHost(client *network.Client, data []byte) error {
+	// Parse the packet
+	var packet packets.PlayerSetHostPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PlayerSetHost packet: %w", err)
+	}
+
+	s.logger.Info().
+		Int32("hostPlayerID", int32(packet.ID)).
+		Str("client", client.Addr.String()).
+		Msg("Received PlayerSetHost packet (unusual - typically server-to-client)")
+
+	// Note: In the C++ implementation, this packet is typically sent FROM server TO clients
+	// If we receive it from a client, we could either ignore it or treat it as a request
+	// For now, we'll log it but not change host status based on client requests
+
+	return nil
+}
+
+// assignHostToFirstPlayer assigns host status to the first player and notifies all clients
+// This matches the C++ CPlayerManager::AssignHostToFirstPlayer() functionality
+func (s *Server) assignHostToFirstPlayer() error {
+	newHost := s.playerManager.AssignHostToFirstPlayer()
+	if newHost == nil {
+		s.logger.Debug().Msg("No players to assign as host")
+		return nil
+	}
+
+	s.logger.Info().
+		Int32("hostPlayerID", int32(newHost.ID)).
+		Str("hostName", newHost.Name).
+		Msg("Assigned host to first player")
+
+	// Send PlayerSetHost packet to all clients
+	packet := packets.NewPlayerSetHostPacket(newHost.ID)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal PlayerSetHost packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PLAYER_SET_HOST,
+		Data: packetData,
+		Flag: network.PacketFlagReliable, // Reliable for important host changes
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, nil); err != nil {
+		return fmt.Errorf("failed to broadcast PlayerSetHost: %w", err)
+	}
+
+	return nil
+}

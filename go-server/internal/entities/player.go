@@ -16,8 +16,8 @@ type Player struct {
 
 // Ped represents a pedestrian/NPC in the game
 type Ped struct {
-	ID                types.PedID
-	Syncer           *Player       // Player who controls this ped
+	ID               types.PedID
+	Syncer           *Player // Player who controls this ped
 	ModelID          int16
 	PedType          uint8
 	Position         types.Vector3
@@ -64,10 +64,71 @@ func (pm *PlayerManager) RemovePlayer(peerAddr string) {
 func (pm *PlayerManager) GetAllPlayers() []*Player {
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
-	
+
 	players := make([]*Player, 0, len(pm.players))
 	for _, player := range pm.players {
 		players = append(players, player)
 	}
 	return players
+}
+
+// GetHost returns the current host player
+func (pm *PlayerManager) GetHost() *Player {
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
+
+	for _, player := range pm.players {
+		if player.IsHost {
+			return player
+		}
+	}
+	return nil
+}
+
+// AssignHostToFirstPlayer assigns host status to the first connected player
+// This matches the C++ CPlayerManager::AssignHostToFirstPlayer() logic
+func (pm *PlayerManager) AssignHostToFirstPlayer() *Player {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
+
+	if len(pm.players) <= 0 {
+		return nil
+	}
+
+	// Find the first player (in Go maps are unordered, so we'll pick any player)
+	var firstPlayer *Player
+	for _, player := range pm.players {
+		firstPlayer = player
+		break
+	}
+
+	if firstPlayer == nil {
+		return nil
+	}
+
+	// Check if this player is already the host
+	currentHost := pm.getHostUnsafe()
+	if currentHost == firstPlayer {
+		return firstPlayer
+	}
+
+	// Remove host status from current host
+	if currentHost != nil {
+		currentHost.IsHost = false
+	}
+
+	// Assign host status to the first player
+	firstPlayer.IsHost = true
+
+	return firstPlayer
+}
+
+// getHostUnsafe returns the current host without locking (internal use only)
+func (pm *PlayerManager) getHostUnsafe() *Player {
+	for _, player := range pm.players {
+		if player.IsHost {
+			return player
+		}
+	}
+	return nil
 }

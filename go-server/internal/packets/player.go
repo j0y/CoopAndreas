@@ -210,6 +210,25 @@ func (p *PlayerKeySyncPacket) Unmarshal(data []byte) error {
 	return nil
 }
 
+// PlayerSetHostPacket represents a notification that a player is now the host
+// This is sent from server to all clients to notify about host changes
+type PlayerSetHostPacket struct {
+	ID types.PlayerID // Player ID that is now the host (matches C++ int playerid)
+}
+
+// Marshal serializes the packet to binary format
+func (p *PlayerSetHostPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PlayerSetHostPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
 // NewPlayerConnectedPacket creates a new player connected notification
 func NewPlayerConnectedPacket(playerID types.PlayerID, isAlreadyConnected bool) *PlayerConnectedPacket {
 	packet := &PlayerConnectedPacket{
@@ -284,5 +303,12 @@ func NewPlayerKeySyncPacket(playerID types.PlayerID, newState CCompressedControl
 	return &PlayerKeySyncPacket{
 		ID:       playerID,
 		NewState: newState,
+	}
+}
+
+// NewPlayerSetHostPacket creates a new player set host packet
+func NewPlayerSetHostPacket(playerID types.PlayerID) *PlayerSetHostPacket {
+	return &PlayerSetHostPacket{
+		ID: playerID,
 	}
 }
