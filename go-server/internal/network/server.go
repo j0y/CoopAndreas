@@ -220,31 +220,32 @@ func (s *Server) handleConnect(event enet.Event) {
 	// Get actual client address from ENet peer
 	enetAddr := peer.GetAddress()
 	addrStr := enetAddr.String()
+	port := enetAddr.GetPort()
 
-	// Parse the address string to create a UDP address
-	// ENet address format might be just "IP" or "IP:PORT"
-	// If there's no port, we need to add one for UDP parsing
+	// Create UDP address using IP string and port from ENet
 	var udpAddr *net.UDPAddr
 	var err error
 
-	if net.ParseIP(addrStr) != nil {
-		// It's just an IP address, add a default port
+	ip := net.ParseIP(addrStr)
+	if ip != nil {
+		// Successfully parsed IP, use it with the port from ENet
 		udpAddr = &net.UDPAddr{
-			IP:   net.ParseIP(addrStr),
-			Port: 0, // Unknown port, use 0 as placeholder
+			IP:   ip,
+			Port: int(port),
 		}
 	} else {
-		// It should be "IP:PORT" format
+		// Fallback to resolving the address string
 		udpAddr, err = net.ResolveUDPAddr("udp", addrStr)
 		if err != nil {
-			// Fallback to placeholder if parsing fails
+			// Final fallback to placeholder if parsing fails
 			s.logger.Warn().
 				Str("enetAddr", addrStr).
+				Uint16("port", port).
 				Err(err).
 				Msg("Failed to parse ENet address, using placeholder")
 			udpAddr = &net.UDPAddr{
 				IP:   net.ParseIP("127.0.0.1"),
-				Port: 0,
+				Port: int(port), // Still use the correct port
 			}
 		}
 	}
@@ -265,6 +266,7 @@ func (s *Server) handleConnect(event enet.Event) {
 		Uint32("clientID", clientID).
 		Str("clientAddr", client.Addr.String()).
 		Str("enetAddr", addrStr).
+		Uint16("port", port).
 		Msg("ENet client connected")
 
 	// Call the connection handler
