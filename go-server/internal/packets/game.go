@@ -3,6 +3,8 @@ package packets
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
+	"math"
 
 	"coopandreas-server/internal/types"
 )
@@ -106,5 +108,65 @@ func NewRebuildPlayerPacket(playerID types.PlayerID, modelKeys [10]uint32, textu
 		TextureKeys: textureKeys,
 		FatStat:     fatStat,
 		MuscleStat:  muscleStat,
+	}
+}
+
+// PlayerPlaceWaypointPacket represents player waypoint placement/removal data
+// This matches the C++ CPackets::PlayerPlaceWaypoint structure exactly
+type PlayerPlaceWaypointPacket struct {
+	PlayerID types.PlayerID // Player ID (matches C++ int playerid)
+	Place    bool           // Whether to place (true) or remove (false) waypoint (matches C++ bool place)
+	Position types.Vector3  // Waypoint position (matches C++ CVector position)
+}
+
+// Marshal serializes the packet to binary format
+// Manual marshaling to match C++ struct layout (bool is 1 byte in C++)
+func (p *PlayerPlaceWaypointPacket) Marshal() ([]byte, error) {
+	buf := make([]byte, 17) // 4 bytes playerid + 1 byte bool + 12 bytes Vector3
+
+	// Write PlayerID (4 bytes)
+	binary.LittleEndian.PutUint32(buf[0:4], uint32(p.PlayerID))
+
+	// Write Place as byte (1 byte, matching C++ bool)
+	if p.Place {
+		buf[4] = 1
+	} else {
+		buf[4] = 0
+	}
+
+	// Write Position (12 bytes - 3 float32s)
+	binary.LittleEndian.PutUint32(buf[5:9], math.Float32bits(p.Position.X))
+	binary.LittleEndian.PutUint32(buf[9:13], math.Float32bits(p.Position.Y))
+	binary.LittleEndian.PutUint32(buf[13:17], math.Float32bits(p.Position.Z))
+
+	return buf, nil
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PlayerPlaceWaypointPacket) Unmarshal(data []byte) error {
+	if len(data) < 17 { // 4 bytes PlayerID + 1 byte Place + 12 bytes Position
+		return fmt.Errorf("PlayerPlaceWaypointPacket: insufficient data, got %d bytes, expected 17", len(data))
+	}
+
+	// Read PlayerID (4 bytes)
+	p.PlayerID = types.PlayerID(binary.LittleEndian.Uint32(data[0:4]))
+
+	// Read Place (1 byte)
+	p.Place = data[4] != 0
+
+	// Read Position (12 bytes)
+	p.Position.X = math.Float32frombits(binary.LittleEndian.Uint32(data[5:9]))
+	p.Position.Y = math.Float32frombits(binary.LittleEndian.Uint32(data[9:13]))
+	p.Position.Z = math.Float32frombits(binary.LittleEndian.Uint32(data[13:17]))
+
+	return nil
+}
+
+// NewPlayerPlaceWaypointPacket creates a new player place waypoint packet
+func NewPlayerPlaceWaypointPacket(playerID types.PlayerID, place bool, position types.Vector3) *PlayerPlaceWaypointPacket {
+	return &PlayerPlaceWaypointPacket{
+		PlayerID: playerID,
+		Place:    place,
+		Position: position,
 	}
 }

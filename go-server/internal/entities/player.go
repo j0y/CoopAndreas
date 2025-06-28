@@ -21,6 +21,9 @@ type Player struct {
 	FatStat         float32    // Fat statistic (matches C++ m_fFatStat)
 	MuscleStat      float32    // Muscle statistic (matches C++ m_fMuscleStat)
 	ClothesModified bool       // Whether clothes have been modified (matching C++ m_ucSyncFlags.bClothesModified)
+	// Player waypoint (matching C++ waypoint data)
+	WaypointPosition types.Vector3 // Waypoint position (matches C++ m_vecWaypointPos)
+	WaypointModified bool          // Whether waypoint has been modified (matching C++ m_ucSyncFlags.bWaypointModified)
 }
 
 // Ped represents a pedestrian/NPC in the game

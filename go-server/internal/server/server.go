@@ -49,6 +49,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleCheckVersion(client, packet.Data)
 	case types.PLAYER_GET_NAME:
 		return s.handlePlayerGetName(client, packet.Data)
+	case types.PLAYER_PLACE_WAYPOINT:
+		return s.handlePlayerPlaceWaypoint(client, packet.Data)
 	case types.PLAYER_ONFOOT:
 		return s.handlePlayerOnFoot(client, packet.Data)
 	case types.PED_SPAWN:

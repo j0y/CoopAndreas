@@ -298,6 +298,35 @@ func (s *Server) sendExistingPlayersTo(client *network.Client, newPlayer *entiti
 					Msg("Sent existing player clothes to new player")
 			}
 		}
+
+		// Send player waypoint if they have one (matching C++ logic)
+		if existingPlayer.WaypointModified {
+			waypointPacket := packets.NewPlayerPlaceWaypointPacket(
+				existingPlayer.ID,
+				true, // place = true since waypoint exists
+				existingPlayer.WaypointPosition,
+			)
+			waypointData, err := waypointPacket.Marshal()
+			if err != nil {
+				s.logger.Error().Err(err).Msg("Failed to marshal waypoint packet")
+				continue
+			}
+
+			waypointNetworkPacket := &network.NetworkPacket{
+				ID:   types.PLAYER_PLACE_WAYPOINT,
+				Data: waypointData,
+				Flag: network.PacketFlagReliable,
+			}
+
+			if err := s.networkServer.SendPacket(client, waypointNetworkPacket); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send waypoint packet")
+			} else {
+				s.logger.Debug().
+					Int32("existingPlayerID", int32(existingPlayer.ID)).
+					Str("newPlayer", newPlayer.Name).
+					Msg("Sent existing player waypoint to new player")
+			}
+		}
 	}
 }
 
@@ -529,6 +558,73 @@ func (s *Server) handleRebuildPlayer(client *network.Client, data []byte) error 
 
 	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
 		return fmt.Errorf("failed to broadcast rebuild player: %w", err)
+	}
+
+	return nil
+}
+
+// handlePlayerPlaceWaypoint handles PLAYER_PLACE_WAYPOINT packets
+// This matches the C++ CPlayerPackets::PlayerPlaceWaypoint::Handle() functionality
+func (s *Server) handlePlayerPlaceWaypoint(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.PlayerPlaceWaypointPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PlayerPlaceWaypoint packet: %w", err)
+	}
+
+	// Set the player ID (security measure - don't trust client, matching C++ logic)
+	packet.PlayerID = player.ID
+
+	// Validate and clamp position coordinates (matching C++ logic: std::clamp(-3000.0f, 3000.0f))
+	const maxCoord = 3000.0
+	const minCoord = -3000.0
+
+	if packet.Position.X > maxCoord {
+		packet.Position.X = maxCoord
+	} else if packet.Position.X < minCoord {
+		packet.Position.X = minCoord
+	}
+
+	if packet.Position.Y > maxCoord {
+		packet.Position.Y = maxCoord
+	} else if packet.Position.Y < minCoord {
+		packet.Position.Y = minCoord
+	}
+
+	s.logger.Debug().
+		Int32("playerID", int32(packet.PlayerID)).
+		Str("player", player.Name).
+		Bool("place", packet.Place).
+		Float32("x", packet.Position.X).
+		Float32("y", packet.Position.Y).
+		Float32("z", packet.Position.Z).
+		Msg("Received player waypoint request")
+
+	// Store the waypoint data in the player entity (matching C++ logic)
+	player.WaypointModified = packet.Place
+	player.WaypointPosition = packet.Position
+
+	// Broadcast the waypoint packet to all other clients (reliable packet)
+	// This matches the C++ logic: CNetwork::SendPacketToAll(CPacketsID::PLAYER_PLACE_WAYPOINT, packet, sizeof * packet, ENET_PACKET_FLAG_RELIABLE, peer);
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal player place waypoint packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PLAYER_PLACE_WAYPOINT,
+		Data: packetData,
+		Flag: network.PacketFlagReliable, // Reliable for important waypoint changes
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast player place waypoint: %w", err)
 	}
 
 	return nil
