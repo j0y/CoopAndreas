@@ -48,7 +48,8 @@ func (s *Server) HandlePlayerConnect(client *network.Client) {
 	handshakePacket := packets.NewPlayerHandshakePacket(player.ID)
 	s.sendHandshakeTo(client, handshakePacket)
 
-	// Send current weather/time state to the new player (matching C++ GameWeatherTime__Trigger)
+	// Send current weather/time state to the new player (server-to-client synchronization)
+	// This ensures new players receive the current weather state upon joining
 	if err := s.sendCurrentWeatherTimeTo(client); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to send current weather/time to new player")
 	}

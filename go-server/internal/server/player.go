@@ -51,10 +51,10 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 			Msg("Player introduced themselves")
 	}
 
-	// Send current weather/time state to the newly named player (matching C++ GameWeatherTime__Trigger)
-	if err := s.sendCurrentWeatherTimeTo(client); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to send weather/time to newly named player")
-	}
+	// Note: In C++ client code, PlayerGetName__Handle calls GameWeatherTime__Trigger()
+	// However, this triggers the CLIENT to send weather data to the SERVER (if client is host)
+	// The server does NOT send weather data to clients during name updates
+	// Weather synchronization happens during connection, not during name updates
 
 	return nil
 }
@@ -409,7 +409,7 @@ func (s *Server) assignHostToFirstPlayer() error {
 	}
 
 	// When a new host is assigned, send current weather/time to all clients
-	// This matches the C++ logic where GameWeatherTime__Trigger is called in PlayerSetHost__Handle
+	// This ensures all clients have synchronized weather after a host change
 	if s.currentWeatherTime != nil {
 		if err := s.broadcastCurrentWeatherTime(); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to broadcast weather/time after host assignment")
