@@ -210,8 +210,8 @@ func (s *Server) handlePedDriverUpdate(client *network.Client, data []byte) erro
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
 
-	// Debug: Check packet size (expected size based on C++ struct)
-	packets.DebugPacketSize("PED_DRIVER_UPDATE", data, 124) // Approximate size based on struct
+	// Debug: Check packet size
+	packets.DebugPacketSize("PED_DRIVER_UPDATE", data, 118)
 
 	// Parse the packet
 	var packet packets.PedDriverUpdatePacket
