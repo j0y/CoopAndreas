@@ -278,3 +278,102 @@ func (s *Server) handleVehicleIdleUpdate(client *network.Client, data []byte) er
 
 	return nil
 }
+
+// handleVehicleDriverUpdate handles VEHICLE_DRIVER_UPDATE packets
+func (s *Server) handleVehicleDriverUpdate(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.Addr.String())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.Addr)
+	}
+
+	// Parse the packet
+	var packet packets.VehicleDriverUpdatePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal VehicleDriverUpdate packet: %w", err)
+	}
+
+	// Set the player ID (clients send 0, server assigns the actual ID)
+	packet.PlayerID = player.ID
+
+	s.logger.Debug().
+		Int32("vehicleID", packet.VehicleID).
+		Int32("playerID", int32(packet.PlayerID)).
+		Str("player", player.Name).
+		Float32("x", packet.Position.X).
+		Float32("y", packet.Position.Y).
+		Float32("z", packet.Position.Z).
+		Float32("health", packet.Health).
+		Uint8("playerHealth", packet.PlayerHealth).
+		Msg("Received vehicle driver update")
+
+	// Get the vehicle
+	vehicle := s.vehicleManager.GetVehicle(types.VehicleID(packet.VehicleID))
+	if vehicle == nil {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("player", player.Name).
+			Msg("Vehicle not found for driver update")
+		return nil // Not an error - vehicle might have been removed
+	}
+
+	// Check if the player is authorized to drive this vehicle
+	// Only the syncer can send driver updates, or we can assign them as driver
+	if vehicle.Syncer != player {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("player", player.Name).
+			Str("syncer", vehicle.Syncer.Name).
+			Msg("Player attempted to send driver update for vehicle they don't control")
+		return nil // Ignore unauthorized updates
+	}
+
+	// Validate weapon (matching C++ logic: 0-18 or 22-46 are valid)
+	isValidWeapon := packet.Weapon <= 18 || (packet.Weapon >= 22 && packet.Weapon <= 46)
+	if !isValidWeapon {
+		packet.Weapon = 0
+		packet.Ammo = 0
+	}
+
+	// Validate player health and armour
+	if packet.PlayerHealth > 100 {
+		packet.PlayerHealth = 100
+	}
+	if packet.PlayerArmour > 100 {
+		packet.PlayerArmour = 100
+	}
+
+	// Update the vehicle's state (matching C++ logic)
+	vehicle.Position = packet.Position
+	vehicle.FullRotation = packet.Rotation
+	vehicle.Roll = packet.Roll
+	vehicle.Velocity = packet.Velocity
+	vehicle.PrimaryColor = packet.Color1
+	vehicle.SecondaryColor = packet.Color2
+	vehicle.Health = packet.Health
+	vehicle.Paintjob = packet.Paintjob
+	vehicle.BikeLean = packet.BikeLean
+	vehicle.MiscComponentAngle = packet.MiscComponentAngle
+	vehicle.PlaneGearState = packet.PlaneGearState
+	vehicle.Locked = packet.Locked
+	vehicle.Driver = player // Set this player as the driver
+
+	// Broadcast the update to all other clients (unreliable packet for frequent updates)
+	// This matches the C++ logic: CNetwork::SendPacketToAll with ENetPacketFlag 0 (unreliable)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal vehicle driver update packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.VEHICLE_DRIVER_UPDATE,
+		Data: packetData,
+		Flag: 0, // Unreliable for frequent position/state updates
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast vehicle driver update: %w", err)
+	}
+
+	return nil
+}

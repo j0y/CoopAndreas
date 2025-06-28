@@ -9,23 +9,26 @@ import (
 
 // Vehicle represents a network vehicle entity
 type Vehicle struct {
-	ID             types.VehicleID // Unique vehicle ID
-	ModelID        uint16          // Vehicle model ID (400-611 for SA)
-	Position       types.Vector3   // Current position
-	Rotation       float32         // Current rotation angle (single axis for basic rotation)
-	FullRotation   types.Vector3   // Full 3D rotation (for advanced idle updates)
-	Roll           types.Vector3   // Vehicle roll vector
-	Velocity       types.Vector3   // Current velocity
-	TurnSpeed      types.Vector3   // Current turn speed
-	PrimaryColor   uint8           // Primary color
-	SecondaryColor uint8           // Secondary color
-	Health         float32         // Vehicle health (0.0 - 1000.0)
-	Paintjob       int8            // Paintjob ID (-1 for none)
-	PlaneGearState float32         // Plane landing gear state (0.0-1.0)
-	Locked         uint8           // Door lock state
-	Syncer         *Player         // Player responsible for syncing this vehicle
-	CreatedBy      uint8           // Who created this vehicle
-	Active         bool            // Whether the vehicle is active
+	ID                 types.VehicleID // Unique vehicle ID
+	ModelID            uint16          // Vehicle model ID (400-611 for SA)
+	Position           types.Vector3   // Current position
+	Rotation           float32         // Current rotation angle (single axis for basic rotation)
+	FullRotation       types.Vector3   // Full 3D rotation (for advanced idle updates)
+	Roll               types.Vector3   // Vehicle roll vector
+	Velocity           types.Vector3   // Current velocity
+	TurnSpeed          types.Vector3   // Current turn speed
+	PrimaryColor       uint8           // Primary color
+	SecondaryColor     uint8           // Secondary color
+	Health             float32         // Vehicle health (0.0 - 1000.0)
+	Paintjob           int8            // Paintjob ID (-1 for none)
+	PlaneGearState     float32         // Plane landing gear state (0.0-1.0)
+	Locked             uint8           // Door lock state
+	BikeLean           float32         // Bike lean angle (for bikes/bmx)
+	MiscComponentAngle uint16          // Misc component angle (e.g., hydra thrusters)
+	Driver             *Player         // Current driver (nil if no driver)
+	Syncer             *Player         // Player responsible for syncing this vehicle
+	CreatedBy          uint8           // Who created this vehicle
+	Active             bool            // Whether the vehicle is active
 }
 
 // VehicleManager manages all network vehicles
@@ -156,21 +159,24 @@ func (vm *VehicleManager) RemoveVehiclesBySyncer(syncer *Player) []*Vehicle {
 // NewVehicle creates a new vehicle entity
 func NewVehicle(id types.VehicleID, modelID uint16, pos types.Vector3, rot float32) *Vehicle {
 	return &Vehicle{
-		ID:             id,
-		ModelID:        modelID,
-		Position:       pos,
-		Rotation:       rot,
-		FullRotation:   types.Vector3{X: 0, Y: 0, Z: rot}, // Convert single rotation to 3D
-		Roll:           types.Vector3{X: 1, Y: 0, Z: 0},   // Default roll vector
-		Velocity:       types.Vector3{X: 0, Y: 0, Z: 0},   // Initially stationary
-		TurnSpeed:      types.Vector3{X: 0, Y: 0, Z: 0},   // No initial turn speed
-		PrimaryColor:   0,
-		SecondaryColor: 0,
-		Health:         1000.0, // Full health
-		Paintjob:       -1,     // No paintjob
-		PlaneGearState: 0.0,    // Gear retracted for planes
-		Locked:         0,      // Unlocked
-		Active:         false,  // Will be set to true when added to manager
+		ID:                 id,
+		ModelID:            modelID,
+		Position:           pos,
+		Rotation:           rot,
+		FullRotation:       types.Vector3{X: 0, Y: 0, Z: rot}, // Convert single rotation to 3D
+		Roll:               types.Vector3{X: 1, Y: 0, Z: 0},   // Default roll vector
+		Velocity:           types.Vector3{X: 0, Y: 0, Z: 0},   // Initially stationary
+		TurnSpeed:          types.Vector3{X: 0, Y: 0, Z: 0},   // No initial turn speed
+		PrimaryColor:       0,
+		SecondaryColor:     0,
+		Health:             1000.0, // Full health
+		Paintjob:           -1,     // No paintjob
+		PlaneGearState:     0.0,    // Gear retracted for planes
+		Locked:             0,      // Unlocked
+		BikeLean:           0.0,    // No lean for bikes
+		MiscComponentAngle: 0,      // Default component angle
+		Driver:             nil,    // No driver initially
+		Active:             false,  // Will be set to true when added to manager
 	}
 }
 
