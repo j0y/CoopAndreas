@@ -55,6 +55,9 @@ func (s *Server) handleGameWeatherTime(client *network.Client, data []byte) erro
 		return nil // Ignore non-host weather updates
 	}
 
+	// Debug: Check packet size (expected: 11 bytes based on C++ struct)
+	packets.DebugPacketSize("GAME_WEATHER_TIME", data, 11)
+
 	// Parse the packet
 	var packet packets.GameWeatherTimePacket
 	if err := packet.Unmarshal(data); err != nil {
@@ -143,6 +146,19 @@ func (s *Server) broadcastCurrentWeatherTime() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal current weather/time: %w", err)
 	}
+
+	// Debug: Check outgoing packet size
+	s.logger.Debug().
+		Int("packetSize", len(packetData)).
+		Uint8("newWeather", s.currentWeatherTime.NewWeather).
+		Uint8("oldWeather", s.currentWeatherTime.OldWeather).
+		Uint8("forcedWeather", s.currentWeatherTime.ForcedWeather).
+		Uint8("currentMonth", s.currentWeatherTime.CurrentMonth).
+		Uint8("currentDay", s.currentWeatherTime.CurrentDay).
+		Uint8("currentHour", s.currentWeatherTime.CurrentHour).
+		Uint8("currentMinute", s.currentWeatherTime.CurrentMinute).
+		Uint32("gameTickCount", s.currentWeatherTime.GameTickCount).
+		Msg("Broadcasting weather/time packet")
 
 	// Broadcast to all clients (reliable packet)
 	networkPacket := &network.NetworkPacket{

@@ -22,17 +22,70 @@ type GameWeatherTimePacket struct {
 	GameTickCount uint32 // Game milliseconds per minute
 }
 
-// Marshal serializes the packet to binary format
+// Marshal serializes the packet to binary format with C++ struct packing
 func (p *GameWeatherTimePacket) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.LittleEndian, p)
-	return buf.Bytes(), err
+
+	// Write each field manually to ensure exact C++ struct layout
+	if err := binary.Write(buf, binary.LittleEndian, p.NewWeather); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.OldWeather); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.ForcedWeather); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.CurrentMonth); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.CurrentDay); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.CurrentHour); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.CurrentMinute); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.GameTickCount); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
 
-// Unmarshal deserializes binary data to packet
+// Unmarshal deserializes binary data to packet with C++ struct packing
 func (p *GameWeatherTimePacket) Unmarshal(data []byte) error {
 	buf := bytes.NewReader(data)
-	return binary.Read(buf, binary.LittleEndian, p)
+
+	// Read each field manually to ensure exact C++ struct layout
+	if err := binary.Read(buf, binary.LittleEndian, &p.NewWeather); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.OldWeather); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.ForcedWeather); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.CurrentMonth); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.CurrentDay); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.CurrentHour); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.CurrentMinute); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.GameTickCount); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // NewGameWeatherTimePacket creates a new game weather/time packet
@@ -56,17 +109,38 @@ type PlayerStatsPacket struct {
 	Stats    [14]float32    // Player statistics array (matches C++ float stats[14])
 }
 
-// Marshal serializes the packet to binary format
+// Marshal serializes the packet to binary format with C++ struct packing
 func (p *PlayerStatsPacket) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.LittleEndian, p)
-	return buf.Bytes(), err
+
+	// Write PlayerID manually
+	if err := binary.Write(buf, binary.LittleEndian, p.PlayerID); err != nil {
+		return nil, err
+	}
+
+	// Write Stats array manually
+	if err := binary.Write(buf, binary.LittleEndian, p.Stats); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
 
-// Unmarshal deserializes binary data to packet
+// Unmarshal deserializes binary data to packet with C++ struct packing
 func (p *PlayerStatsPacket) Unmarshal(data []byte) error {
 	buf := bytes.NewReader(data)
-	return binary.Read(buf, binary.LittleEndian, p)
+
+	// Read PlayerID manually
+	if err := binary.Read(buf, binary.LittleEndian, &p.PlayerID); err != nil {
+		return err
+	}
+
+	// Read Stats array manually
+	if err := binary.Read(buf, binary.LittleEndian, &p.Stats); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // NewPlayerStatsPacket creates a new player stats packet
@@ -87,17 +161,68 @@ type RebuildPlayerPacket struct {
 	MuscleStat  float32        // Muscle statistic (matches C++ float m_fMuscleStat)
 }
 
-// Marshal serializes the packet to binary format
+// Marshal serializes the packet to binary format with C++ struct packing
 func (p *RebuildPlayerPacket) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.LittleEndian, p)
-	return buf.Bytes(), err
+
+	// Write PlayerID manually
+	if err := binary.Write(buf, binary.LittleEndian, p.PlayerID); err != nil {
+		return nil, err
+	}
+
+	// Write ModelKeys array manually
+	if err := binary.Write(buf, binary.LittleEndian, p.ModelKeys); err != nil {
+		return nil, err
+	}
+
+	// Write TextureKeys array manually
+	if err := binary.Write(buf, binary.LittleEndian, p.TextureKeys); err != nil {
+		return nil, err
+	}
+
+	// Write FatStat manually
+	if err := binary.Write(buf, binary.LittleEndian, p.FatStat); err != nil {
+		return nil, err
+	}
+
+	// Write MuscleStat manually
+	if err := binary.Write(buf, binary.LittleEndian, p.MuscleStat); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
 
-// Unmarshal deserializes binary data to packet
+// Unmarshal deserializes binary data to packet with C++ struct packing
 func (p *RebuildPlayerPacket) Unmarshal(data []byte) error {
 	buf := bytes.NewReader(data)
-	return binary.Read(buf, binary.LittleEndian, p)
+
+	// Read PlayerID manually
+	if err := binary.Read(buf, binary.LittleEndian, &p.PlayerID); err != nil {
+		return err
+	}
+
+	// Read ModelKeys array manually
+	if err := binary.Read(buf, binary.LittleEndian, &p.ModelKeys); err != nil {
+		return err
+	}
+
+	// Read TextureKeys array manually
+	if err := binary.Read(buf, binary.LittleEndian, &p.TextureKeys); err != nil {
+		return err
+	}
+
+	// Read FatStat manually
+	if err := binary.Read(buf, binary.LittleEndian, &p.FatStat); err != nil {
+		return err
+	}
+
+	// Read MuscleStat manually
+	if err := binary.Read(buf, binary.LittleEndian, &p.MuscleStat); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // NewRebuildPlayerPacket creates a new rebuild player packet
