@@ -295,3 +295,48 @@ func NewPlayerPlaceWaypointPacket(playerID types.PlayerID, place bool, position 
 		Position: position,
 	}
 }
+
+// PlayMissionAudioPacket represents mission audio playback synchronization data
+// This matches the C++ CPackets::PlayMissionAudio structure exactly
+type PlayMissionAudioPacket struct {
+	SlotID  uint8 // Audio slot ID (matches C++ uint8_t slotid)
+	AudioID int32 // Audio ID to play (matches C++ int audioid)
+}
+
+// Marshal serializes the packet to binary format with C++ struct packing
+func (p *PlayMissionAudioPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	// Write each field manually to ensure exact C++ struct layout
+	if err := binary.Write(buf, binary.LittleEndian, p.SlotID); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.AudioID); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes binary data to packet with C++ struct packing
+func (p *PlayMissionAudioPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+
+	// Read each field manually to ensure exact C++ struct layout
+	if err := binary.Read(buf, binary.LittleEndian, &p.SlotID); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.AudioID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// NewPlayMissionAudioPacket creates a new play mission audio packet
+func NewPlayMissionAudioPacket(slotID uint8, audioID int32) *PlayMissionAudioPacket {
+	return &PlayMissionAudioPacket{
+		SlotID:  slotID,
+		AudioID: audioID,
+	}
+}

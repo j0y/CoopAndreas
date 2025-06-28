@@ -230,3 +230,63 @@ func (s *Server) handleOpCodeSync(client *network.Client, data []byte) error {
 
 	return nil
 }
+
+// handlePlayMissionAudio handles PLAY_MISSION_AUDIO packets
+// This matches the C++ CPlayerPackets::PlayMissionAudio::Handle() functionality
+// Only the host player can send mission audio playback packets
+func (s *Server) handlePlayMissionAudio(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (!player->m_bIsHost) return;)
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Int32("playerID", int32(player.ID)).
+			Msg("Non-host player attempted to send mission audio")
+		return nil // Ignore non-host mission audio
+	}
+
+	// Debug: Check packet size (expected: 5 bytes based on C++ struct)
+	packets.DebugPacketSize("PLAY_MISSION_AUDIO", data, 5)
+
+	// Parse the packet
+	var packet packets.PlayMissionAudioPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PlayMissionAudio packet: %w", err)
+	}
+
+	// Log the mission audio playback
+	s.logger.Debug().
+		Str("hostPlayer", player.Name).
+		Uint8("slotID", packet.SlotID).
+		Int32("audioID", packet.AudioID).
+		Msg("Host triggered mission audio playback")
+
+	// Broadcast to all other clients (reliable packet, matching C++ ENET_PACKET_FLAG_RELIABLE)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal PlayMissionAudio packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PLAY_MISSION_AUDIO,
+		Data: packetData,
+		Flag: network.PacketFlagReliable, // Reliable for mission audio synchronization
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast mission audio: %w", err)
+	}
+
+	s.logger.Info().
+		Str("hostPlayer", player.Name).
+		Uint8("slotID", packet.SlotID).
+		Int32("audioID", packet.AudioID).
+		Msg("Broadcasted mission audio to all clients")
+
+	return nil
+}
