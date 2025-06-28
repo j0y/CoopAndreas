@@ -65,11 +65,8 @@ func (s *Server) handlePedSpawn(client *network.Client, data []byte) error {
 		return fmt.Errorf("failed to broadcast ped spawn: %w", err)
 	}
 
-	// Send confirmation back to spawner
-	confirmPacket := packets.PedConfirmPacket{
-		TempID: packet.TempID,
-		PedID:  packet.PedID,
-	}
+	// Send confirmation back to spawner (matching C++ logic)
+	confirmPacket := packets.NewPedConfirmPacket(packet.TempID, packet.PedID)
 
 	confirmData, err := confirmPacket.Marshal()
 	if err != nil {

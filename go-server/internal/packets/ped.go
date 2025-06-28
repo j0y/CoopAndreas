@@ -194,3 +194,11 @@ func (p *PedConfirmPacket) Unmarshal(data []byte) error {
 	buf := bytes.NewReader(data)
 	return binary.Read(buf, binary.LittleEndian, p)
 }
+
+// NewPedConfirmPacket creates a new ped confirmation packet
+func NewPedConfirmPacket(tempID uint8, pedID int32) *PedConfirmPacket {
+	return &PedConfirmPacket{
+		TempID: tempID,
+		PedID:  pedID,
+	}
+}
