@@ -162,50 +162,53 @@ func (p *PlayerOnFootPacket) Unmarshal(data []byte) error {
 
 // PlayerKeySyncPacket represents a packet for synchronizing player controller state
 // This matches the C++ CPackets::PlayerKeySync structure exactly
-// Uses manual marshaling/unmarshaling to match C++ struct packing (14 bytes total)
+// NOTE: Client sends incomplete data - only 12 bytes instead of expected 14 bytes
+// This suggests the client might not send the disableFlags field (last 2 bytes)
 type PlayerKeySyncPacket struct {
-	ID       types.PlayerID             // Player ID (matches C++ int playerid)
-	NewState CCompressedControllerState // Compressed controller state
+	ID       types.PlayerID // Player ID (4 bytes) - set by server, client may send garbage
+	NewState struct {
+		LeftStickX int16  // 2 bytes
+		LeftStickY int16  // 2 bytes
+		Compressed uint32 // 4 bytes
+		// DisableFlags field appears to be missing in client packets (2 bytes missing)
+		// Total: 4 + 2 + 2 + 4 = 12 bytes (matches received data)
+	}
 }
 
 // Marshal serializes the packet to binary format (manual to match C++ struct packing)
 func (p *PlayerKeySyncPacket) Marshal() ([]byte, error) {
-	buf := make([]byte, 14) // C++ struct size: 4 bytes playerid + 10 bytes CCompressedControllerState
+	buf := make([]byte, 12) // Actual client packet size: 4 bytes playerid + 8 bytes partial controller state
 
 	// Write PlayerID (4 bytes)
 	binary.LittleEndian.PutUint32(buf[0:4], uint32(p.ID))
 
-	// Write CCompressedControllerState (10 bytes, tightly packed)
+	// Write partial controller state (8 bytes, missing DisableFlags)
 	// LeftStickX (2 bytes)
 	binary.LittleEndian.PutUint16(buf[4:6], uint16(p.NewState.LeftStickX))
 	// LeftStickY (2 bytes)
 	binary.LittleEndian.PutUint16(buf[6:8], uint16(p.NewState.LeftStickY))
 	// Compressed (4 bytes)
 	binary.LittleEndian.PutUint32(buf[8:12], p.NewState.Compressed)
-	// DisableFlags (2 bytes)
-	binary.LittleEndian.PutUint16(buf[12:14], p.NewState.DisableFlags)
 
 	return buf, nil
 }
 
 // Unmarshal deserializes binary data to packet (manual to match C++ struct packing)
 func (p *PlayerKeySyncPacket) Unmarshal(data []byte) error {
-	if len(data) < 14 {
-		return fmt.Errorf("PlayerKeySyncPacket: insufficient data, got %d bytes, expected 14", len(data))
+	if len(data) < 12 {
+		return fmt.Errorf("PlayerKeySyncPacket: insufficient data, got %d bytes, expected 12", len(data))
 	}
 
 	// Read PlayerID (4 bytes)
 	p.ID = types.PlayerID(binary.LittleEndian.Uint32(data[0:4]))
 
-	// Read CCompressedControllerState (10 bytes, tightly packed)
+	// Read partial controller state (8 bytes, missing DisableFlags)
 	// LeftStickX (2 bytes)
 	p.NewState.LeftStickX = int16(binary.LittleEndian.Uint16(data[4:6]))
 	// LeftStickY (2 bytes)
 	p.NewState.LeftStickY = int16(binary.LittleEndian.Uint16(data[6:8]))
 	// Compressed (4 bytes)
 	p.NewState.Compressed = binary.LittleEndian.Uint32(data[8:12])
-	// DisableFlags (2 bytes)
-	p.NewState.DisableFlags = binary.LittleEndian.Uint16(data[12:14])
 
 	return nil
 }
@@ -299,10 +302,18 @@ func NewPlayerOnFootPacket(playerID types.PlayerID, position, velocity types.Vec
 }
 
 // NewPlayerKeySyncPacket creates a new player key synchronization packet
-func NewPlayerKeySyncPacket(playerID types.PlayerID, newState CCompressedControllerState) *PlayerKeySyncPacket {
+func NewPlayerKeySyncPacket(playerID types.PlayerID, leftStickX, leftStickY int16, compressed uint32) *PlayerKeySyncPacket {
 	return &PlayerKeySyncPacket{
-		ID:       playerID,
-		NewState: newState,
+		ID: playerID,
+		NewState: struct {
+			LeftStickX int16
+			LeftStickY int16
+			Compressed uint32
+		}{
+			LeftStickX: leftStickX,
+			LeftStickY: leftStickY,
+			Compressed: compressed,
+		},
 	}
 }
 
