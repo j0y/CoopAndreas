@@ -7,6 +7,7 @@ import (
 
 	"coopandreas-server/internal/entities"
 	"coopandreas-server/internal/network"
+	"coopandreas-server/internal/packets"
 	"coopandreas-server/internal/types"
 	"coopandreas-server/internal/version"
 )
@@ -19,6 +20,8 @@ type Server struct {
 	networkServer  *network.Server
 	versionManager *version.Manager
 	logger         zerolog.Logger
+	// Global game state
+	currentWeatherTime *packets.GameWeatherTimePacket // Current weather/time state, nil if not set
 }
 
 // New creates a new game server instance

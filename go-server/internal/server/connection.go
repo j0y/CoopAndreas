@@ -48,6 +48,11 @@ func (s *Server) HandlePlayerConnect(client *network.Client) {
 	handshakePacket := packets.NewPlayerHandshakePacket(player.ID)
 	s.sendHandshakeTo(client, handshakePacket)
 
+	// Send current weather/time state to the new player (matching C++ GameWeatherTime__Trigger)
+	if err := s.sendCurrentWeatherTimeTo(client); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to send current weather/time to new player")
+	}
+
 	// Assign host if no current host exists (first player becomes host)
 	if s.playerManager.GetHost() == nil {
 		s.logger.Debug().Msg("No current host found, assigning host to first player")

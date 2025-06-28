@@ -68,6 +68,9 @@ func (s *Server) handleGameWeatherTime(client *network.Client, data []byte) erro
 		Uint8("currentMinute", packet.CurrentMinute).
 		Msg("Host updated weather/time")
 
+	// Store the current weather/time state for new client synchronization
+	s.currentWeatherTime = &packet
+
 	// Marshal the packet for rebroadcast
 	packetData, err := packet.Marshal()
 	if err != nil {
@@ -84,6 +87,79 @@ func (s *Server) handleGameWeatherTime(client *network.Client, data []byte) erro
 	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
 		return fmt.Errorf("failed to broadcast GameWeatherTime: %w", err)
 	}
+
+	return nil
+}
+
+// sendCurrentWeatherTimeTo sends the current weather/time state to a specific client
+// This matches the C++ logic where GameWeatherTime__Trigger is called after player connects
+func (s *Server) sendCurrentWeatherTimeTo(client *network.Client) error {
+	// Only send if we have current weather/time state
+	if s.currentWeatherTime == nil {
+		s.logger.Debug().
+			Str("client", client.Addr.String()).
+			Msg("No current weather/time state to send to new client")
+		return nil
+	}
+
+	// Marshal the current weather/time packet
+	packetData, err := s.currentWeatherTime.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal current weather/time: %w", err)
+	}
+
+	// Send to the specific client (reliable packet)
+	networkPacket := &network.NetworkPacket{
+		ID:   types.GAME_WEATHER_TIME,
+		Data: packetData,
+		Flag: network.PacketFlagReliable,
+	}
+
+	if err := s.networkServer.SendPacket(client, networkPacket); err != nil {
+		return fmt.Errorf("failed to send weather/time to client: %w", err)
+	}
+
+	s.logger.Debug().
+		Str("client", client.Addr.String()).
+		Uint8("newWeather", s.currentWeatherTime.NewWeather).
+		Uint8("currentHour", s.currentWeatherTime.CurrentHour).
+		Uint8("currentMinute", s.currentWeatherTime.CurrentMinute).
+		Msg("Sent current weather/time to client")
+
+	return nil
+}
+
+// broadcastCurrentWeatherTime broadcasts the current weather/time state to all clients
+// This is used when a new host is assigned to synchronize all clients
+func (s *Server) broadcastCurrentWeatherTime() error {
+	// Only broadcast if we have current weather/time state
+	if s.currentWeatherTime == nil {
+		s.logger.Debug().Msg("No current weather/time state to broadcast")
+		return nil
+	}
+
+	// Marshal the current weather/time packet
+	packetData, err := s.currentWeatherTime.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal current weather/time: %w", err)
+	}
+
+	// Broadcast to all clients (reliable packet)
+	networkPacket := &network.NetworkPacket{
+		ID:   types.GAME_WEATHER_TIME,
+		Data: packetData,
+		Flag: network.PacketFlagReliable,
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, nil); err != nil {
+		return fmt.Errorf("failed to broadcast weather/time: %w", err)
+	}
+
+	s.logger.Debug().
+		Uint8("newWeather", s.currentWeatherTime.NewWeather).
+		Uint8("currentHour", s.currentWeatherTime.CurrentHour).
+		Uint8("currentMinute", s.currentWeatherTime.CurrentMinute).
+		Msg("Broadcasted current weather/time to all clients")
 
 	return nil
 }

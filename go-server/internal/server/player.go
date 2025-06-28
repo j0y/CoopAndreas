@@ -51,8 +51,10 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 			Msg("Player introduced themselves")
 	}
 
-	// TODO: Trigger GameWeatherTime like in C++ (CPacketHandler::GameWeatherTime__Trigger)
-	// This would send current weather/time state to the newly named player
+	// Send current weather/time state to the newly named player (matching C++ GameWeatherTime__Trigger)
+	if err := s.sendCurrentWeatherTimeTo(client); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to send weather/time to newly named player")
+	}
 
 	return nil
 }
@@ -319,6 +321,14 @@ func (s *Server) assignHostToFirstPlayer() error {
 
 	if err := s.networkServer.SendPacketToAll(networkPacket, nil); err != nil {
 		return fmt.Errorf("failed to broadcast PlayerSetHost: %w", err)
+	}
+
+	// When a new host is assigned, send current weather/time to all clients
+	// This matches the C++ logic where GameWeatherTime__Trigger is called in PlayerSetHost__Handle
+	if s.currentWeatherTime != nil {
+		if err := s.broadcastCurrentWeatherTime(); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to broadcast weather/time after host assignment")
+		}
 	}
 
 	return nil
