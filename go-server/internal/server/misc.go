@@ -15,10 +15,10 @@ func (s *Server) handleMassPacketSequence(client *network.Client, data []byte) e
 	// The server simply rebroadcasts the entire mass packet sequence to all other clients
 	// without parsing or processing the individual packets within it
 
-	s.logger.Debug().
-		Str("client", client.Addr.String()).
-		Int("dataSize", len(data)).
-		Msg("Received mass packet sequence, rebroadcasting to all clients")
+	//s.logger.Debug().
+	//	Str("client", client.Addr.String()).
+	//	Int("dataSize", len(data)).
+	//	Msg("Received mass packet sequence, rebroadcasting to all clients")
 
 	// Create network packet for rebroadcast
 	networkPacket := &network.NetworkPacket{
