@@ -131,6 +131,10 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleRemoveMessageGXT(client, packet.Data)
 	case types.CLEAR_ENTITY_BLIPS:
 		return s.handleClearEntityBlips(client, packet.Data)
+	case types.UPDATE_CHECKPOINT:
+		return s.handleUpdateCheckpoint(client, packet.Data)
+	case types.REMOVE_CHECKPOINT:
+		return s.handleRemoveCheckpoint(client, packet.Data)
 	case types.MASS_PACKET_SEQUENCE:
 		return s.handleMassPacketSequence(client, packet.Data)
 	default:

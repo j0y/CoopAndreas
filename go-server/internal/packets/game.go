@@ -873,3 +873,82 @@ func NewClearEntityBlipsPacket(playerID int32) *ClearEntityBlipsPacket {
 		PlayerID: playerID,
 	}
 }
+
+// UpdateCheckpointPacket represents checkpoint update data
+// This matches the C++ CPackets::UpdateCheckpoint structure exactly
+type UpdateCheckpointPacket struct {
+	PlayerID types.PlayerID // Target player ID (matches C++ int playerid)
+	Position types.Vector3  // Checkpoint position (matches C++ CVector position)
+	Radius   types.Vector3  // Checkpoint radius (matches C++ CVector radius)
+}
+
+// Marshal serializes the packet to binary format with C++ struct packing
+func (p *UpdateCheckpointPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	// Write each field manually to ensure exact C++ struct layout
+	if err := binary.Write(buf, binary.LittleEndian, p.PlayerID); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.Position); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.Radius); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes binary data to packet with C++ struct packing
+func (p *UpdateCheckpointPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+
+	// Read each field manually to ensure exact C++ struct layout
+	if err := binary.Read(buf, binary.LittleEndian, &p.PlayerID); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.Position); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.Radius); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// NewUpdateCheckpointPacket creates a new checkpoint update packet
+func NewUpdateCheckpointPacket(playerID types.PlayerID, position, radius types.Vector3) *UpdateCheckpointPacket {
+	return &UpdateCheckpointPacket{
+		PlayerID: playerID,
+		Position: position,
+		Radius:   radius,
+	}
+}
+
+// RemoveCheckpointPacket represents checkpoint removal data
+// This matches the C++ CPackets::RemoveCheckpoint structure exactly
+type RemoveCheckpointPacket struct {
+	PlayerID types.PlayerID // Target player ID (matches C++ int playerid)
+}
+
+// Marshal serializes the packet to binary format
+func (p *RemoveCheckpointPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p.PlayerID)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *RemoveCheckpointPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, &p.PlayerID)
+}
+
+// NewRemoveCheckpointPacket creates a new checkpoint removal packet
+func NewRemoveCheckpointPacket(playerID types.PlayerID) *RemoveCheckpointPacket {
+	return &RemoveCheckpointPacket{
+		PlayerID: playerID,
+	}
+}

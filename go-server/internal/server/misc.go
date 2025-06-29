@@ -790,3 +790,127 @@ func (s *Server) handleClearEntityBlips(client *network.Client, data []byte) err
 
 	return nil
 }
+
+// handleUpdateCheckpoint handles UPDATE_CHECKPOINT packets
+// This matches the C++ CPlayerPackets::UpdateCheckpoint::Handle() functionality
+// Only the host player can update checkpoints, and it gets sent to the specific target player
+func (s *Server) handleUpdateCheckpoint(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Str("client", client.GetClientID()).
+			Msg("Non-host player attempted to update checkpoint")
+		return nil // Ignore non-host checkpoint updates
+	}
+
+	// Parse the packet
+	var packet packets.UpdateCheckpointPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal UpdateCheckpoint packet: %w", err)
+	}
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Int32("targetPlayerID", int32(packet.PlayerID)).
+		Float32("posX", packet.Position.X).
+		Float32("posY", packet.Position.Y).
+		Float32("posZ", packet.Position.Z).
+		Float32("radiusX", packet.Radius.X).
+		Float32("radiusY", packet.Radius.Y).
+		Float32("radiusZ", packet.Radius.Z).
+		Msg("Host updating checkpoint")
+
+	// Find the target player and get their client (matching C++ logic: if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid)))
+	targetClient := s.getClientByPlayerID(packet.PlayerID)
+	if targetClient == nil {
+		s.logger.Warn().
+			Int32("targetPlayerID", int32(packet.PlayerID)).
+			Msg("Target player or client not found for checkpoint update")
+		return nil // Target player doesn't exist or client not found
+	}
+
+	// Send packet to target client (reliable packet, matching C++ logic)
+	// This matches C++ logic: CNetwork::SendPacket(targetPlayer->m_pPeer, ...)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal checkpoint update packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.UPDATE_CHECKPOINT,
+		Data: packetData,
+		Flag: 1, // Reliable for checkpoint synchronization (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacket(targetClient, networkPacket); err != nil {
+		return fmt.Errorf("failed to send checkpoint update to target player: %w", err)
+	}
+
+	return nil
+}
+
+// handleRemoveCheckpoint handles REMOVE_CHECKPOINT packets
+// This matches the C++ CPlayerPackets::RemoveCheckpoint::Handle() functionality
+// Only the host player can remove checkpoints, and it gets sent to the specific target player
+func (s *Server) handleRemoveCheckpoint(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Str("client", client.GetClientID()).
+			Msg("Non-host player attempted to remove checkpoint")
+		return nil // Ignore non-host checkpoint removals
+	}
+
+	// Parse the packet
+	var packet packets.RemoveCheckpointPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal RemoveCheckpoint packet: %w", err)
+	}
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Int32("targetPlayerID", int32(packet.PlayerID)).
+		Msg("Host removing checkpoint")
+
+	// Find the target player and get their client (matching C++ logic: if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid)))
+	targetClient := s.getClientByPlayerID(packet.PlayerID)
+	if targetClient == nil {
+		s.logger.Warn().
+			Int32("targetPlayerID", int32(packet.PlayerID)).
+			Msg("Target player or client not found for checkpoint removal")
+		return nil // Target player doesn't exist or client not found
+	}
+
+	// Send packet to target client (reliable packet, matching C++ logic)
+	// This matches C++ logic: CNetwork::SendPacket(targetPlayer->m_pPeer, ...)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal checkpoint removal packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.REMOVE_CHECKPOINT,
+		Data: packetData,
+		Flag: 1, // Reliable for checkpoint synchronization (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacket(targetClient, networkPacket); err != nil {
+		return fmt.Errorf("failed to send checkpoint removal to target player: %w", err)
+	}
+
+	return nil
+}
