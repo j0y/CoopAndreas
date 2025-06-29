@@ -847,3 +847,29 @@ func NewRemoveMessageGXTPacket(playerID int32, gxt string) *RemoveMessageGXTPack
 	packet.SetGXTString(gxt)
 	return packet
 }
+
+// ClearEntityBlipsPacket represents entity blip clearing data
+// This matches the C++ CPackets::ClearEntityBlips structure exactly
+type ClearEntityBlipsPacket struct {
+	PlayerID int32 // Target player ID (matches C++ int playerid)
+}
+
+// Marshal serializes the packet to binary format
+func (p *ClearEntityBlipsPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p.PlayerID)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *ClearEntityBlipsPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, &p.PlayerID)
+}
+
+// NewClearEntityBlipsPacket creates a new entity blip clearing packet
+func NewClearEntityBlipsPacket(playerID int32) *ClearEntityBlipsPacket {
+	return &ClearEntityBlipsPacket{
+		PlayerID: playerID,
+	}
+}

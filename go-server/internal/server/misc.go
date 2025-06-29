@@ -731,3 +731,62 @@ func (s *Server) handleRemoveMessageGXT(client *network.Client, data []byte) err
 
 	return nil
 }
+
+// handleClearEntityBlips handles CLEAR_ENTITY_BLIPS packets
+// This matches the C++ CPlayerPackets::ClearEntityBlips::Handle() functionality
+// Only the host player can clear entity blips, and it gets sent to the specific target player
+func (s *Server) handleClearEntityBlips(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Str("client", client.GetClientID()).
+			Msg("Non-host player attempted to clear entity blips")
+		return nil // Ignore non-host entity blip clearing
+	}
+
+	// Parse the packet
+	var packet packets.ClearEntityBlipsPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal ClearEntityBlips packet: %w", err)
+	}
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Int32("targetPlayerID", packet.PlayerID).
+		Msg("Host clearing entity blips")
+
+	// Find the target player and get their client (matching C++ logic: if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid)))
+	targetClient := s.getClientByPlayerID(types.PlayerID(packet.PlayerID))
+	if targetClient == nil {
+		s.logger.Warn().
+			Int32("targetPlayerID", packet.PlayerID).
+			Msg("Target player or client not found for entity blip clearing")
+		return nil // Target player doesn't exist or client not found
+	}
+
+	// Send packet to target client (reliable packet, matching C++ logic)
+	// This matches C++ logic: CNetwork::SendPacket(targetPlayer->m_pPeer, ...)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal entity blip clearing packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.CLEAR_ENTITY_BLIPS,
+		Data: packetData,
+		Flag: 1, // Reliable for blip synchronization (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacket(targetClient, networkPacket); err != nil {
+		return fmt.Errorf("failed to send entity blip clearing to target player: %w", err)
+	}
+
+	return nil
+}

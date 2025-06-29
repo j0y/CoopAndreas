@@ -129,6 +129,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleAddMessageGXT(client, packet.Data)
 	case types.REMOVE_MESSAGE_GXT:
 		return s.handleRemoveMessageGXT(client, packet.Data)
+	case types.CLEAR_ENTITY_BLIPS:
+		return s.handleClearEntityBlips(client, packet.Data)
 	case types.MASS_PACKET_SEQUENCE:
 		return s.handleMassPacketSequence(client, packet.Data)
 	default:
