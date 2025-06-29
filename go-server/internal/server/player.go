@@ -708,3 +708,52 @@ func (s *Server) handlePlayerBulletShot(client *network.Client, data []byte) err
 
 	return nil
 }
+
+// handlePlayerChatMessage handles PLAYER_CHAT_MESSAGE packets
+func (s *Server) handlePlayerChatMessage(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.PlayerChatMessagePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PlayerChatMessage packet: %w", err)
+	}
+
+	// Override the player ID with the server's authoritative player ID (matching C++ logic)
+	packet.PlayerID = player.ID
+
+	// Ensure message is null-terminated (matching C++ logic)
+	packet.Message[128] = 0
+
+	// Extract the message for logging
+	message := packet.GetMessage()
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Int32("playerID", int32(player.ID)).
+		Str("message", message).
+		Msg("Player chat message")
+
+	// Broadcast to all other clients (reliable packet)
+	// This matches C++ logic: SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal chat message packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PLAYER_CHAT_MESSAGE,
+		Data: packetData,
+		Flag: 1, // Reliable for chat messages (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast chat message: %w", err)
+	}
+
+	return nil
+}

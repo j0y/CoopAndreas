@@ -277,6 +277,67 @@ func (p *PlayerBulletShotPacket) Unmarshal(data []byte) error {
 	return binary.Read(buf, binary.LittleEndian, p)
 }
 
+// PlayerChatMessagePacket represents a chat message from a player
+// This matches the C++ CPackets::PlayerChatMessage structure exactly
+// Note: Uses UTF-16 encoding (wchar_t) with 129 wide characters (128 + null terminator)
+type PlayerChatMessagePacket struct {
+	PlayerID types.PlayerID // Player ID (matches C++ int playerid)
+	Message  [129]uint16    // UTF-16 message (matches C++ wchar_t message[128+1])
+}
+
+// Marshal serializes the packet to binary format
+func (p *PlayerChatMessagePacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PlayerChatMessagePacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
+// SetMessage sets the message from a UTF-8 string, converting to UTF-16
+func (p *PlayerChatMessagePacket) SetMessage(message string) {
+	// Clear the message array
+	for i := range p.Message {
+		p.Message[i] = 0
+	}
+
+	// Convert UTF-8 string to UTF-16 runes and store
+	runes := []rune(message)
+	maxLen := len(p.Message) - 1 // Reserve space for null terminator
+
+	for i, r := range runes {
+		if i >= maxLen {
+			break // Truncate if message is too long
+		}
+		p.Message[i] = uint16(r)
+	}
+	// Null terminator is already set by clearing the array
+}
+
+// GetMessage extracts the UTF-8 string from the UTF-16 message
+func (p *PlayerChatMessagePacket) GetMessage() string {
+	// Find the null terminator
+	length := 0
+	for i, char := range p.Message {
+		if char == 0 {
+			length = i
+			break
+		}
+	}
+
+	// Convert UTF-16 to UTF-8
+	runes := make([]rune, length)
+	for i := 0; i < length; i++ {
+		runes[i] = rune(p.Message[i])
+	}
+
+	return string(runes)
+}
+
 // NewPlayerConnectedPacket creates a new player connected notification
 func NewPlayerConnectedPacket(playerID types.PlayerID, isAlreadyConnected bool) *PlayerConnectedPacket {
 	packet := &PlayerConnectedPacket{
@@ -387,4 +448,13 @@ func NewPlayerBulletShotPacket(playerID types.PlayerID, targetID int32, startPos
 		IncrementalHit: incrementalHit,
 		EntityType:     entityType,
 	}
+}
+
+// NewPlayerChatMessagePacket creates a new chat message packet
+func NewPlayerChatMessagePacket(playerID types.PlayerID, message string) *PlayerChatMessagePacket {
+	packet := &PlayerChatMessagePacket{
+		PlayerID: playerID,
+	}
+	packet.SetMessage(message)
+	return packet
 }

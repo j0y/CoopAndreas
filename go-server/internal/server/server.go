@@ -95,6 +95,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleVehicleComponentRemove(client, packet.Data)
 	case types.VEHICLE_PASSENGER_UPDATE:
 		return s.handleVehiclePassengerUpdate(client, packet.Data)
+	case types.PLAYER_CHAT_MESSAGE:
+		return s.handlePlayerChatMessage(client, packet.Data)
 	case types.GAME_WEATHER_TIME:
 		return s.handleGameWeatherTime(client, packet.Data)
 	case types.OPCODE_SYNC:
