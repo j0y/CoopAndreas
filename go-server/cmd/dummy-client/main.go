@@ -187,7 +187,7 @@ func (c *DummyClient) run() {
 		// Check if it's time to send position update (non-blocking)
 		select {
 		case <-ticker.C:
-			log.Info().Msg("Sending scheduled position update")
+			//log.Info().Msg("Sending scheduled position update")
 			c.updatePosition()
 			if !c.sendPositionUpdate() {
 				log.Error().Msg("Failed to send position update, stopping client")
@@ -274,12 +274,12 @@ func (c *DummyClient) sendPositionUpdate() bool {
 		return false
 	}
 
-	log.Debug().
-		Float32("x", c.position.X).
-		Float32("y", c.position.Y).
-		Float32("z", c.position.Z).
-		Float32("angle", c.angle).
-		Msg("Sending position update")
+	//log.Debug().
+	//	Float32("x", c.position.X).
+	//	Float32("y", c.position.Y).
+	//	Float32("z", c.position.Z).
+	//	Float32("angle", c.angle).
+	//	Msg("Sending position update")
 
 	// Create and send network packet
 	return c.sendPacket(types.PLAYER_ONFOOT, packetData)
