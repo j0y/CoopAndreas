@@ -158,14 +158,14 @@ func (s *Server) SetNetworkServer(netServer *network.Server) {
 }
 
 // getClientByPlayer finds the network client associated with a specific player
-// This matches the C++ approach where they have direct access to player->m_pPeer
+// Now simplified since client.PlayerID matches the player ID directly
 func (s *Server) getClientByPlayer(player *entities.Player) *network.Client {
 	if player == nil {
 		return nil
 	}
 
-	// Direct lookup using PeerAddr (much simpler than before)
-	return s.networkServer.GetClient(player.PeerAddr)
+	// Direct lookup using PlayerID (much simpler and more efficient)
+	return s.networkServer.GetClientByPlayerID(player.ID)
 }
 
 // getClientByPlayerID finds the network client associated with a specific player ID
