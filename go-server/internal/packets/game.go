@@ -679,3 +679,171 @@ func NewRemoveEntityBlipPacket(playerID int32, entityType types.NetworkEntityTyp
 		EntityID:   entityID,
 	}
 }
+
+// AddMessageGXTPacket represents GXT message addition data
+// This matches the C++ CPackets::AddMessageGXT structure exactly
+type AddMessageGXTPacket struct {
+	PlayerID int32   // Target player ID (matches C++ int playerid)
+	Type     uint8   // Message type: 0=PRINT, 1=PRINT_BIG, 2=PRINT_NOW, 3=PRINT_HELP (matches C++ uint8_t type)
+	Time     uint32  // Display time in milliseconds (matches C++ uint32_t time)
+	Flag     uint8   // Additional flags (matches C++ uint8_t flag)
+	GXT      [8]byte // GXT string identifier (matches C++ char gxt[8])
+}
+
+// Marshal serializes the packet to binary format with C++ struct packing
+func (p *AddMessageGXTPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	// Write each field manually to ensure exact C++ struct layout
+	if err := binary.Write(buf, binary.LittleEndian, p.PlayerID); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.Type); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.Time); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.Flag); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.GXT); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes binary data to packet with C++ struct packing
+func (p *AddMessageGXTPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+
+	// Read each field manually to ensure exact C++ struct layout
+	if err := binary.Read(buf, binary.LittleEndian, &p.PlayerID); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.Type); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.Time); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.Flag); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.GXT); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetGXTString returns the GXT string as a string
+func (p *AddMessageGXTPacket) GetGXTString() string {
+	// Find the null terminator and return the string up to that point
+	for i, b := range p.GXT {
+		if b == 0 {
+			return string(p.GXT[:i])
+		}
+	}
+	return string(p.GXT[:])
+}
+
+// SetGXTString sets the GXT string (truncates if longer than 7 chars)
+func (p *AddMessageGXTPacket) SetGXTString(gxt string) {
+	// Clear the array first
+	for i := range p.GXT {
+		p.GXT[i] = 0
+	}
+
+	// Copy the string (max 7 chars to leave room for null terminator)
+	maxLen := len(p.GXT) - 1
+	if len(gxt) < maxLen {
+		maxLen = len(gxt)
+	}
+	copy(p.GXT[:], gxt[:maxLen])
+}
+
+// NewAddMessageGXTPacket creates a new GXT message addition packet
+func NewAddMessageGXTPacket(playerID int32, msgType uint8, time uint32, flag uint8, gxt string) *AddMessageGXTPacket {
+	packet := &AddMessageGXTPacket{
+		PlayerID: playerID,
+		Type:     msgType,
+		Time:     time,
+		Flag:     flag,
+	}
+	packet.SetGXTString(gxt)
+	return packet
+}
+
+// RemoveMessageGXTPacket represents GXT message removal data
+// This matches the C++ CPackets::RemoveMessageGXT structure exactly
+type RemoveMessageGXTPacket struct {
+	PlayerID int32   // Target player ID (matches C++ int playerid)
+	GXT      [8]byte // GXT string identifier (matches C++ char gxt[8])
+}
+
+// Marshal serializes the packet to binary format with C++ struct packing
+func (p *RemoveMessageGXTPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	// Write each field manually to ensure exact C++ struct layout
+	if err := binary.Write(buf, binary.LittleEndian, p.PlayerID); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.GXT); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes binary data to packet with C++ struct packing
+func (p *RemoveMessageGXTPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+
+	// Read each field manually to ensure exact C++ struct layout
+	if err := binary.Read(buf, binary.LittleEndian, &p.PlayerID); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.GXT); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetGXTString returns the GXT string as a string
+func (p *RemoveMessageGXTPacket) GetGXTString() string {
+	// Find the null terminator and return the string up to that point
+	for i, b := range p.GXT {
+		if b == 0 {
+			return string(p.GXT[:i])
+		}
+	}
+	return string(p.GXT[:])
+}
+
+// SetGXTString sets the GXT string (truncates if longer than 7 chars)
+func (p *RemoveMessageGXTPacket) SetGXTString(gxt string) {
+	// Clear the array first
+	for i := range p.GXT {
+		p.GXT[i] = 0
+	}
+
+	// Copy the string (max 7 chars to leave room for null terminator)
+	maxLen := len(p.GXT) - 1
+	if len(gxt) < maxLen {
+		maxLen = len(gxt)
+	}
+	copy(p.GXT[:], gxt[:maxLen])
+}
+
+// NewRemoveMessageGXTPacket creates a new GXT message removal packet
+func NewRemoveMessageGXTPacket(playerID int32, gxt string) *RemoveMessageGXTPacket {
+	packet := &RemoveMessageGXTPacket{
+		PlayerID: playerID,
+	}
+	packet.SetGXTString(gxt)
+	return packet
+}

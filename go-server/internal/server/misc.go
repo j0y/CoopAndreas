@@ -608,3 +608,126 @@ func (s *Server) handleRemoveEntityBlip(client *network.Client, data []byte) err
 
 	return nil
 }
+
+// handleAddMessageGXT handles ADD_MESSAGE_GXT packets
+// This matches the C++ CPlayerPackets::AddMessageGXT::Handle() functionality
+// Only the host player can add GXT messages, and it gets sent to the specific target player
+func (s *Server) handleAddMessageGXT(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Str("client", client.GetClientID()).
+			Msg("Non-host player attempted to add GXT message")
+		return nil // Ignore non-host GXT message additions
+	}
+
+	// Parse the packet
+	var packet packets.AddMessageGXTPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal AddMessageGXT packet: %w", err)
+	}
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Int32("targetPlayerID", packet.PlayerID).
+		Uint8("type", packet.Type).
+		Str("gxt", packet.GetGXTString()).
+		Uint32("time", packet.Time).
+		Uint8("flag", packet.Flag).
+		Msg("Host adding GXT message")
+
+	// Find the target player and get their client (matching C++ logic: if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid)))
+	targetClient := s.getClientByPlayerID(types.PlayerID(packet.PlayerID))
+	if targetClient == nil {
+		s.logger.Warn().
+			Int32("targetPlayerID", packet.PlayerID).
+			Msg("Target player or client not found for GXT message addition")
+		return nil // Target player doesn't exist or client not found
+	}
+
+	// Send packet to target client (reliable packet, matching C++ logic)
+	// This matches C++ logic: CNetwork::SendPacket(targetPlayer->m_pPeer, ...)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal GXT message addition packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.ADD_MESSAGE_GXT,
+		Data: packetData,
+		Flag: 1, // Reliable for message synchronization (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacket(targetClient, networkPacket); err != nil {
+		return fmt.Errorf("failed to send GXT message addition to target player: %w", err)
+	}
+
+	return nil
+}
+
+// handleRemoveMessageGXT handles REMOVE_MESSAGE_GXT packets
+// This matches the C++ CPlayerPackets::RemoveMessageGXT::Handle() functionality
+// Only the host player can remove GXT messages, and it gets sent to the specific target player
+func (s *Server) handleRemoveMessageGXT(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Str("client", client.GetClientID()).
+			Msg("Non-host player attempted to remove GXT message")
+		return nil // Ignore non-host GXT message removals
+	}
+
+	// Parse the packet
+	var packet packets.RemoveMessageGXTPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal RemoveMessageGXT packet: %w", err)
+	}
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Int32("targetPlayerID", packet.PlayerID).
+		Str("gxt", packet.GetGXTString()).
+		Msg("Host removing GXT message")
+
+	// Find the target player and get their client (matching C++ logic: if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid)))
+	targetClient := s.getClientByPlayerID(types.PlayerID(packet.PlayerID))
+	if targetClient == nil {
+		s.logger.Warn().
+			Int32("targetPlayerID", packet.PlayerID).
+			Msg("Target player or client not found for GXT message removal")
+		return nil // Target player doesn't exist or client not found
+	}
+
+	// Send packet to target client (reliable packet, matching C++ logic)
+	// This matches C++ logic: CNetwork::SendPacket(targetPlayer->m_pPeer, ...)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal GXT message removal packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.REMOVE_MESSAGE_GXT,
+		Data: packetData,
+		Flag: 1, // Reliable for message synchronization (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacket(targetClient, networkPacket); err != nil {
+		return fmt.Errorf("failed to send GXT message removal to target player: %w", err)
+	}
+
+	return nil
+}
