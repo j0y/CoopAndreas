@@ -410,17 +410,17 @@ func (s *Server) GetClientCount() int {
 	return len(s.clients)
 }
 
-// GetClient returns a client by its string ID (converted from uint32)
-func (s *Server) GetClient(clientIDStr string) *Client {
-	// Convert string client ID back to uint32
-	// The client ID string is typically a converted uint32
-	var clientID uint32
-	if _, err := fmt.Sscanf(clientIDStr, "%d", &clientID); err != nil {
-		return nil
-	}
-
+// GetClient returns a client by its address string (IP:Port)
+func (s *Server) GetClient(clientAddr string) *Client {
 	s.clientsMutex.RLock()
 	defer s.clientsMutex.RUnlock()
 
-	return s.clients[clientID]
+	// Find client by matching address
+	for _, client := range s.clients {
+		if client.Addr.String() == clientAddr {
+			return client
+		}
+	}
+
+	return nil
 }
