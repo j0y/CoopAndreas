@@ -29,6 +29,16 @@ type DummyClient struct {
 	movementTime float64 // Track movement time for circular motion
 }
 
+// packVersion packs semantic version components into uint32 format
+// This mimics the behavior of semver_parse from the C++ implementation
+// Format: major(9 bits) | minor(9 bits) | patch(10 bits) | stage(4 bits)
+func packVersion(major, minor, patch uint16, stage uint8) uint32 {
+	return ((uint32(major) & 0x1FF) << 23) |
+		((uint32(minor) & 0x1FF) << 14) |
+		((uint32(patch) & 0x3FF) << 4) |
+		(uint32(stage) & 0x3)
+}
+
 func main() {
 	// Configure logger for dummy client
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05"})
@@ -59,9 +69,19 @@ func main() {
 	}
 	defer host.Destroy()
 
-	// Connect to server
+	// Connect to server with version data
 	addr := enet.NewAddress(*serverIP, uint16(*serverPort))
-	peer, err := host.Connect(addr, 2, 0) // 2 channels, no data
+	// Pack version into uint32 (similar to semver_parse)
+	// Format: major(9 bits) | minor(9 bits) | patch(10 bits) | stage(4 bits)
+	// For version "0.1.1-alpha" -> major=0, minor=1, patch=1, stage=1 (alpha)
+	versionData := packVersion(0, 1, 1, 1) // Parse "0.1.1-alpha" (stage 1 = alpha)
+
+	log.Info().
+		Uint32("versionData", versionData).
+		Str("version", "0.1.1-alpha").
+		Msg("Connecting with version data")
+
+	peer, err := host.Connect(addr, 2, versionData) // 2 channels, version as data
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to server")
 		return
@@ -71,9 +91,9 @@ func main() {
 		host:         host,
 		peer:         peer,
 		playerName:   *playerName,
-		position:     types.Vector3{X: 1000.0, Y: 1500.0, Z: 3.0}, // Start at spawn point
+		position:     types.Vector3{X: 2498.562, Y: -1676.865, Z: 13.34375}, // Start at spawn point
 		angle:        0.0,
-		moveSpeed:    2.0, // Units per second
+		moveSpeed:    2.5, // Units per second
 		running:      true,
 		connected:    false,
 		playerID:     0, // Will be set by server
@@ -124,15 +144,7 @@ func (c *DummyClient) run() {
 		return
 	}
 
-	// Step 1: Send version check
-	if !c.sendVersionCheck() {
-		return
-	}
-
-	// Wait a bit for server response
-	time.Sleep(500 * time.Millisecond)
-
-	// Step 2: Send player name
+	// Step 1: Send player name (skip version check since it's sent via ENet connection data)
 	if !c.sendPlayerName() {
 		return
 	}
@@ -142,8 +154,8 @@ func (c *DummyClient) run() {
 
 	log.Info().Msg("Starting position updates...")
 
-	// Step 3: Start sending position updates in a loop
-	ticker := time.NewTicker(2 * time.Second) // Every 2 seconds
+	// Step 2: Start sending position updates in a loop
+	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
 	// Send initial position update
@@ -165,9 +177,9 @@ func (c *DummyClient) run() {
 			case enet.EventReceive:
 				// Handle received packets (we're not processing server responses in this dummy client)
 				packet := event.GetPacket()
-				log.Debug().
-					Int("size", len(packet.GetData())).
-					Msg("Received packet from server")
+				//log.Debug().
+				//	Int("size", len(packet.GetData())).
+				//	Msg("Received packet from server")
 				packet.Destroy()
 			}
 		}
@@ -187,28 +199,6 @@ func (c *DummyClient) run() {
 	}
 
 	log.Info().Msg("Client stopped")
-}
-
-func (c *DummyClient) sendVersionCheck() bool {
-	log.Info().Msg("Sending version check")
-
-	// Create a CheckVersion packet
-	versionCheck := packets.CheckVersionPacket{
-		ProtocolVersion: types.ProtocolVersion,
-	}
-
-	// Set client version
-	copy(versionCheck.ClientVersion[:], types.ServerVersion)
-
-	// Marshal packet data
-	packetData, err := versionCheck.Marshal()
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to marshal CheckVersion")
-		return false
-	}
-
-	// Create and send network packet
-	return c.sendPacket(types.CHECK_VERSION, packetData)
 }
 
 func (c *DummyClient) sendPlayerName() bool {
@@ -249,7 +239,7 @@ func (c *DummyClient) updatePosition() {
 	c.position.Y += velocityY
 
 	// Add some Z-axis bobbing for visual effect
-	c.position.Z = 3.0 + float32(math.Sin(c.movementTime*2.0))*0.5 // Subtle bobbing
+	// c.position.Z = 3.0 + float32(math.Sin(c.movementTime*2.0))*0.5 // Subtle bobbing
 
 	// Gradually turn the player (complete rotation every ~30 seconds)
 	angleChange := float32(deltaTime * 0.2) // Radians per second
