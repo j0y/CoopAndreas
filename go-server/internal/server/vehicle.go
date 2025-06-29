@@ -779,3 +779,50 @@ func (s *Server) handleVehicleComponentAdd(client *network.Client, data []byte) 
 
 	return nil
 }
+
+// handleVehicleComponentRemove handles VEHICLE_COMPONENT_REMOVE packets
+func (s *Server) handleVehicleComponentRemove(client *network.Client, data []byte) error {
+	// Parse the packet
+	var packet packets.VehicleComponentRemovePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal VehicleComponentRemove packet: %w", err)
+	}
+
+	// Get the vehicle
+	vehicle := s.vehicleManager.GetVehicle(types.VehicleID(packet.VehicleID))
+	if vehicle == nil {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("client", client.GetClientID()).
+			Msg("Vehicle component remove packet for non-existent vehicle")
+		return nil // Ignore packets for non-existent vehicles
+	}
+
+	// Remove the component from the vehicle (matching C++ logic)
+	vehicle.RemoveComponent(packet.ComponentID)
+
+	s.logger.Debug().
+		Int32("vehicleID", packet.VehicleID).
+		Int32("componentID", packet.ComponentID).
+		Str("client", client.GetClientID()).
+		Msg("Vehicle component removed")
+
+	// Broadcast to all other clients (reliable packet)
+	// This matches C++ logic: SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal vehicle component remove packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.VEHICLE_COMPONENT_REMOVE,
+		Data: packetData,
+		Flag: 1, // Reliable for component updates (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast vehicle component remove: %w", err)
+	}
+
+	return nil
+}

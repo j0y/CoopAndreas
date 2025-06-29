@@ -91,6 +91,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleVehicleDamage(client, packet.Data)
 	case types.VEHICLE_COMPONENT_ADD:
 		return s.handleVehicleComponentAdd(client, packet.Data)
+	case types.VEHICLE_COMPONENT_REMOVE:
+		return s.handleVehicleComponentRemove(client, packet.Data)
 	case types.VEHICLE_PASSENGER_UPDATE:
 		return s.handleVehiclePassengerUpdate(client, packet.Data)
 	case types.GAME_WEATHER_TIME:
