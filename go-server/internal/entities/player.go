@@ -152,3 +152,16 @@ func (pm *PlayerManager) getHostUnsafe() *Player {
 	}
 	return nil
 }
+
+// GetClientIDByPlayer returns the client ID associated with a player
+func (pm *PlayerManager) GetClientIDByPlayer(player *Player) string {
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
+
+	for clientID, managedPlayer := range pm.players {
+		if managedPlayer.ID == player.ID {
+			return clientID
+		}
+	}
+	return ""
+}

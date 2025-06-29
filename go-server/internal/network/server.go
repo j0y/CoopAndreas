@@ -436,3 +436,18 @@ func (s *Server) GetClientCount() int {
 	defer s.clientsMutex.RUnlock()
 	return len(s.clients)
 }
+
+// GetClient returns a client by its string ID (converted from uint32)
+func (s *Server) GetClient(clientIDStr string) *Client {
+	// Convert string client ID back to uint32
+	// The client ID string is typically a converted uint32
+	var clientID uint32
+	if _, err := fmt.Sscanf(clientIDStr, "%d", &clientID); err != nil {
+		return nil
+	}
+
+	s.clientsMutex.RLock()
+	defer s.clientsMutex.RUnlock()
+
+	return s.clients[clientID]
+}

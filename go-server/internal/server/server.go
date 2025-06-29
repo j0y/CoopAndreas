@@ -105,6 +105,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleVehicleComponentRemove(client, packet.Data)
 	case types.VEHICLE_PASSENGER_UPDATE:
 		return s.handleVehiclePassengerUpdate(client, packet.Data)
+	case types.ASSIGN_VEHICLE:
+		return s.handleAssignVehicle(client, packet.Data)
 	case types.PLAYER_CHAT_MESSAGE:
 		return s.handlePlayerChatMessage(client, packet.Data)
 	case types.GAME_WEATHER_TIME:
@@ -127,4 +129,21 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 // SetNetworkServer sets the network server reference (for sending packets)
 func (s *Server) SetNetworkServer(netServer *network.Server) {
 	s.networkServer = netServer
+}
+
+// getClientByPlayer finds the network client associated with a specific player
+// This matches the C++ approach where they have direct access to player->m_pPeer
+func (s *Server) getClientByPlayer(player *entities.Player) *network.Client {
+	if player == nil {
+		return nil
+	}
+
+	// Get the client ID associated with this player
+	clientID := s.playerManager.GetClientIDByPlayer(player)
+	if clientID == "" {
+		return nil
+	}
+
+	// Get the client from the network server
+	return s.networkServer.GetClient(clientID)
 }

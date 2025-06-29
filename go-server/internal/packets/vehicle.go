@@ -333,6 +333,25 @@ func (p *VehicleComponentRemovePacket) Unmarshal(data []byte) error {
 	return binary.Read(buf, binary.LittleEndian, p)
 }
 
+// AssignVehiclePacket represents an assign vehicle syncer packet
+// This matches the C++ CVehiclePackets::AssignVehicleSyncer structure exactly
+type AssignVehiclePacket struct {
+	VehicleID int32 // Vehicle ID to assign/unassign syncing for
+}
+
+// Marshal serializes the packet to binary format
+func (p *AssignVehiclePacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *AssignVehiclePacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
 // NewVehicleSpawnPacket creates a new vehicle spawn packet
 func NewVehicleSpawnPacket(vehicleID int32, tempID uint8, modelID uint16, pos types.Vector3, rot float32, color1, color2, createdBy uint8) *VehicleSpawnPacket {
 	return &VehicleSpawnPacket{
@@ -458,5 +477,12 @@ func NewVehicleComponentRemovePacket(vehicleID int32, componentID int32) *Vehicl
 	return &VehicleComponentRemovePacket{
 		VehicleID:   vehicleID,
 		ComponentID: componentID,
+	}
+}
+
+// NewAssignVehiclePacket creates a new assign vehicle packet
+func NewAssignVehiclePacket(vehicleID int32) *AssignVehiclePacket {
+	return &AssignVehiclePacket{
+		VehicleID: vehicleID,
 	}
 }

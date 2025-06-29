@@ -494,17 +494,44 @@ func (s *Server) handleVehicleEnter(client *network.Client, data []byte) error {
 
 	// Check if player is trying to enter as driver (seat 0)
 	if packet.SeatID == 0 && !packet.Passenger {
-		// Player wants to drive
-		if vehicle.Driver != nil && vehicle.Driver != player {
+		// Player wants to drive - this matches C++ VehicleEnter logic
+		if vehicle.GetOccupant(0) != nil && vehicle.GetOccupant(0) != player {
 			s.logger.Warn().
 				Int32("vehicleID", packet.VehicleID).
 				Str("player", player.Name).
-				Str("currentDriver", vehicle.Driver.Name).
+				Str("currentDriver", vehicle.GetOccupant(0).Name).
 				Msg("Vehicle already has a driver")
 			return nil // Vehicle already has a driver
 		}
-		vehicle.Driver = player
-		vehicle.Syncer = player // Driver becomes syncer
+
+		// Set occupant and reassign syncer (matching C++ logic)
+		vehicle.SetOccupant(0, player)
+		s.reassignVehicleSyncer(vehicle, player)
+	} else {
+		// Player wants to enter as passenger (matching C++ logic for passenger seats)
+		// Check if seat is already occupied
+		if vehicle.GetOccupant(int(packet.SeatID)) != nil {
+			s.logger.Warn().
+				Int32("vehicleID", packet.VehicleID).
+				Str("player", player.Name).
+				Uint8("seatID", packet.SeatID).
+				Msg("Vehicle seat already occupied")
+			return nil
+		}
+
+		// Set passenger and check if we need to reassign syncer
+		vehicle.SetOccupant(int(packet.SeatID), player)
+
+		// If there's no driver, reassign syncer to a passenger (matching C++ logic)
+		if vehicle.GetOccupant(0) == nil {
+			// Find any passenger to become syncer (matching C++ logic)
+			for i := 1; i < 8; i++ {
+				if occupant := vehicle.GetOccupant(i); occupant != nil {
+					s.reassignVehicleSyncer(vehicle, occupant)
+					break
+				}
+			}
+		}
 	}
 
 	s.logger.Info().
@@ -558,13 +585,20 @@ func (s *Server) handleVehicleExit(client *network.Client, data []byte) error {
 		Bool("force", packet.Force).
 		Msg("Received vehicle exit request")
 
-	// Find the vehicle the player is currently in
-	// We need to iterate through vehicles to find which one this player is driving
-	// This matches the C++ logic where they check player->m_pPed->m_pVehicle
+	// Find the vehicle the player is currently in and their seat
+	// We need to iterate through vehicles to find which one this player is in
+	// This matches the C++ logic where they check player occupancy
 	var currentVehicle *entities.Vehicle
+	var playerSeatID int = -1
 	for _, vehicle := range s.vehicleManager.GetAllVehicles() {
-		if vehicle.Driver != nil && vehicle.Driver.ID == player.ID {
-			currentVehicle = vehicle
+		for seatID := 0; seatID < 8; seatID++ {
+			if occupant := vehicle.GetOccupant(seatID); occupant != nil && occupant.ID == player.ID {
+				currentVehicle = vehicle
+				playerSeatID = seatID
+				break
+			}
+		}
+		if currentVehicle != nil {
 			break
 		}
 	}
@@ -579,14 +613,33 @@ func (s *Server) handleVehicleExit(client *network.Client, data []byte) error {
 	s.logger.Info().
 		Int32("vehicleID", int32(currentVehicle.ID)).
 		Str("player", player.Name).
+		Int("seatID", playerSeatID).
+		Bool("wasDriver", playerSeatID == 0).
 		Bool("force", packet.Force).
 		Msg("Player exiting vehicle")
 
-	// Update vehicle occupancy state - clear driver if this player was driving
-	if currentVehicle.Driver != nil && currentVehicle.Driver.ID == player.ID {
-		currentVehicle.Driver = nil
-		// Note: We don't change the syncer here, they may still be responsible for syncing
-		// the vehicle even after exiting (this matches typical multiplayer behavior)
+	// Remove player from vehicle occupancy (matching C++ logic)
+	currentVehicle.RemoveOccupant(playerSeatID)
+
+	// Handle syncer reassignment if driver left (matching C++ CVehicle exit logic)
+	if playerSeatID == 0 { // Driver exited
+		// Find a passenger to become the new syncer (matching C++ logic)
+		var newSyncer *entities.Player
+		for i := 1; i < 8; i++ {
+			if occupant := currentVehicle.GetOccupant(i); occupant != nil {
+				newSyncer = occupant
+				break
+			}
+		}
+
+		if newSyncer != nil {
+			s.reassignVehicleSyncer(currentVehicle, newSyncer)
+		} else {
+			// No passengers left, keep current syncer (they may still sync the empty vehicle)
+			s.logger.Debug().
+				Int32("vehicleID", int32(currentVehicle.ID)).
+				Msg("Driver exited but no passengers to reassign syncer")
+		}
 	}
 
 	// Broadcast the exit packet to all other clients (reliable packet)
@@ -822,6 +875,125 @@ func (s *Server) handleVehicleComponentRemove(client *network.Client, data []byt
 
 	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
 		return fmt.Errorf("failed to broadcast vehicle component remove: %w", err)
+	}
+
+	return nil
+}
+
+// handleAssignVehicle handles ASSIGN_VEHICLE packets
+// This is a client-side packet handler (rarely used on server)
+// The client uses this to toggle vehicle syncing state
+func (s *Server) handleAssignVehicle(client *network.Client, data []byte) error {
+	// Parse the packet
+	var packet packets.AssignVehiclePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal AssignVehicle packet: %w", err)
+	}
+
+	// Find the vehicle
+	vehicle := s.vehicleManager.GetVehicle(types.VehicleID(packet.VehicleID))
+	if vehicle == nil {
+		s.logger.Debug().
+			Int32("vehicleID", packet.VehicleID).
+			Str("client", client.GetClientID()).
+			Msg("AssignVehicle packet for non-existent vehicle")
+		return nil // Ignore packets for non-existent vehicles
+	}
+
+	s.logger.Debug().
+		Int32("vehicleID", packet.VehicleID).
+		Str("client", client.GetClientID()).
+		Msg("Received AssignVehicle packet (client-side handling)")
+
+	// Note: This packet is typically handled on the client side to toggle
+	// vehicle syncing state. The server usually doesn't need to process this,
+	// but we log it for debugging purposes.
+
+	return nil
+}
+
+// sendAssignVehiclePacket sends an ASSIGN_VEHICLE packet to a specific client
+// This matches the C++ server logic in CVehicle::ReassignSyncer
+func (s *Server) sendAssignVehiclePacket(client *network.Client, vehicleID types.VehicleID) error {
+	packet := packets.AssignVehiclePacket{
+		VehicleID: int32(vehicleID),
+	}
+
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal assign vehicle packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.ASSIGN_VEHICLE,
+		Data: packetData,
+		Flag: 1, // Reliable for syncer assignment (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacket(client, networkPacket); err != nil {
+		return fmt.Errorf("failed to send assign vehicle packet: %w", err)
+	}
+
+	s.logger.Debug().
+		Int32("vehicleID", int32(vehicleID)).
+		Str("client", client.GetClientID()).
+		Msg("Sent AssignVehicle packet")
+
+	return nil
+}
+
+// reassignVehicleSyncer reassigns a vehicle syncer and sends appropriate packets
+// This matches the C++ CVehicle::ReassignSyncer logic exactly
+func (s *Server) reassignVehicleSyncer(vehicle *entities.Vehicle, newSyncer *entities.Player) error {
+	if vehicle.Syncer != newSyncer {
+		oldSyncer := vehicle.Syncer
+
+		// Send to the old vehicle syncer (matching C++ logic)
+		if oldSyncer != nil {
+			oldSyncerClient := s.getClientByPlayer(oldSyncer)
+			if oldSyncerClient != nil {
+				if err := s.sendAssignVehiclePacket(oldSyncerClient, vehicle.ID); err != nil {
+					s.logger.Error().
+						Err(err).
+						Int32("vehicleID", int32(vehicle.ID)).
+						Str("oldSyncer", oldSyncer.Name).
+						Msg("Failed to send assign vehicle packet to old syncer")
+				}
+			}
+		}
+
+		// Send to the new vehicle syncer (matching C++ logic)
+		if newSyncer != nil {
+			newSyncerClient := s.getClientByPlayer(newSyncer)
+			if newSyncerClient != nil {
+				if err := s.sendAssignVehiclePacket(newSyncerClient, vehicle.ID); err != nil {
+					s.logger.Error().
+						Err(err).
+						Int32("vehicleID", int32(vehicle.ID)).
+						Str("newSyncer", newSyncer.Name).
+						Msg("Failed to send assign vehicle packet to new syncer")
+				}
+			}
+		}
+
+		// Update the vehicle syncer (matching C++ logic: this->m_pSyncer = newSyncer)
+		vehicle.ReassignSyncer(newSyncer)
+
+		s.logger.Debug().
+			Int32("vehicleID", int32(vehicle.ID)).
+			Str("oldSyncer", func() string {
+				if oldSyncer != nil {
+					return oldSyncer.Name
+				}
+				return "none"
+			}()).
+			Str("newSyncer", func() string {
+				if newSyncer != nil {
+					return newSyncer.Name
+				}
+				return "none"
+			}()).
+			Msg("Vehicle syncer reassigned")
 	}
 
 	return nil

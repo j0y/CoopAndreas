@@ -276,3 +276,12 @@ func (v *Vehicle) GetComponents() []int32 {
 	copy(components, v.Components)
 	return components
 }
+
+// ReassignSyncer changes the vehicle syncer and notifies relevant clients
+// This matches the C++ CVehicle::ReassignSyncer logic
+// Note: The actual packet sending is handled by the server using sendAssignVehiclePacket
+func (v *Vehicle) ReassignSyncer(newSyncer *Player) {
+	if v.Syncer != newSyncer {
+		v.Syncer = newSyncer
+	}
+}
