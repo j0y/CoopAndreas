@@ -165,3 +165,16 @@ func (pm *PlayerManager) GetClientIDByPlayer(player *Player) string {
 	}
 	return ""
 }
+
+// GetPlayerByID returns a player by their Player ID
+func (pm *PlayerManager) GetPlayerByID(playerID types.PlayerID) *Player {
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
+
+	for _, player := range pm.players {
+		if player.ID == playerID {
+			return player
+		}
+	}
+	return nil
+}

@@ -121,6 +121,10 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleSkipCutscene(client, packet.Data)
 	case types.ON_MISSION_FLAG_SYNC:
 		return s.handleOnMissionFlagSync(client, packet.Data)
+	case types.UPDATE_ENTITY_BLIP:
+		return s.handleUpdateEntityBlip(client, packet.Data)
+	case types.REMOVE_ENTITY_BLIP:
+		return s.handleRemoveEntityBlip(client, packet.Data)
 	case types.MASS_PACKET_SEQUENCE:
 		return s.handleMassPacketSequence(client, packet.Data)
 	default:

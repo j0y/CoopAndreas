@@ -532,3 +532,150 @@ func NewOnMissionFlagSyncPacket(onMission bool) *OnMissionFlagSyncPacket {
 	packet.SetOnMission(onMission)
 	return packet
 }
+
+// UpdateEntityBlipPacket represents entity blip update data
+// This matches the C++ CPackets::UpdateEntityBlip structure exactly
+type UpdateEntityBlipPacket struct {
+	PlayerID   int32                   // Target player ID (matches C++ int playerid)
+	EntityType types.NetworkEntityType // Entity type (matches C++ eNetworkEntityType)
+	EntityID   int32                   // Entity ID (matches C++ int entityId)
+	IsFriendly bool                    // Whether blip is friendly (matches C++ bool isFriendly)
+	Color      uint8                   // Blip color (matches C++ uint8_t color)
+	Display    uint8                   // Display type (matches C++ uint8_t display)
+	Scale      uint8                   // Blip scale (matches C++ uint8_t scale)
+}
+
+// Marshal serializes the packet to binary format with C++ struct packing
+func (p *UpdateEntityBlipPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	// Write each field manually to ensure exact C++ struct layout
+	if err := binary.Write(buf, binary.LittleEndian, p.PlayerID); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.EntityType); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.EntityID); err != nil {
+		return nil, err
+	}
+	// Convert bool to uint8 for C++ compatibility
+	var isFriendlyByte uint8
+	if p.IsFriendly {
+		isFriendlyByte = 1
+	}
+	if err := binary.Write(buf, binary.LittleEndian, isFriendlyByte); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.Color); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.Display); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.Scale); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes binary data to packet with C++ struct packing
+func (p *UpdateEntityBlipPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+
+	// Read each field manually to ensure exact C++ struct layout
+	if err := binary.Read(buf, binary.LittleEndian, &p.PlayerID); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.EntityType); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.EntityID); err != nil {
+		return err
+	}
+	// Read bool as uint8 for C++ compatibility
+	var isFriendlyByte uint8
+	if err := binary.Read(buf, binary.LittleEndian, &isFriendlyByte); err != nil {
+		return err
+	}
+	p.IsFriendly = isFriendlyByte != 0
+	if err := binary.Read(buf, binary.LittleEndian, &p.Color); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.Display); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.Scale); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// NewUpdateEntityBlipPacket creates a new entity blip update packet
+func NewUpdateEntityBlipPacket(playerID int32, entityType types.NetworkEntityType, entityID int32,
+	isFriendly bool, color, display, scale uint8) *UpdateEntityBlipPacket {
+	return &UpdateEntityBlipPacket{
+		PlayerID:   playerID,
+		EntityType: entityType,
+		EntityID:   entityID,
+		IsFriendly: isFriendly,
+		Color:      color,
+		Display:    display,
+		Scale:      scale,
+	}
+}
+
+// RemoveEntityBlipPacket represents entity blip removal data
+// This matches the C++ CPackets::RemoveEntityBlip structure exactly
+type RemoveEntityBlipPacket struct {
+	PlayerID   int32                   // Target player ID (matches C++ int playerid)
+	EntityType types.NetworkEntityType // Entity type (matches C++ eNetworkEntityType)
+	EntityID   int32                   // Entity ID (matches C++ int entityId)
+}
+
+// Marshal serializes the packet to binary format with C++ struct packing
+func (p *RemoveEntityBlipPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	// Write each field manually to ensure exact C++ struct layout
+	if err := binary.Write(buf, binary.LittleEndian, p.PlayerID); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.EntityType); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, p.EntityID); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes binary data to packet with C++ struct packing
+func (p *RemoveEntityBlipPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+
+	// Read each field manually to ensure exact C++ struct layout
+	if err := binary.Read(buf, binary.LittleEndian, &p.PlayerID); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.EntityType); err != nil {
+		return err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &p.EntityID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// NewRemoveEntityBlipPacket creates a new entity blip removal packet
+func NewRemoveEntityBlipPacket(playerID int32, entityType types.NetworkEntityType, entityID int32) *RemoveEntityBlipPacket {
+	return &RemoveEntityBlipPacket{
+		PlayerID:   playerID,
+		EntityType: entityType,
+		EntityID:   entityID,
+	}
+}
