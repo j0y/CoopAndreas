@@ -952,3 +952,108 @@ func NewRemoveCheckpointPacket(playerID types.PlayerID) *RemoveCheckpointPacket 
 		PlayerID: playerID,
 	}
 }
+
+// CreateStaticBlipPacket represents static blip creation data
+// This matches the C++ CPackets::CreateStaticBlip structure exactly
+// Note: C++ uses bitfields which we handle with manual marshaling
+type CreateStaticBlipPacket struct {
+	Position     types.Vector3 // Blip position (matches C++ CVector position)
+	Sprite       int8          // Blip sprite ID (matches C++ int8_t sprite)
+	Display      uint8         // Display type (2 bits, matches C++ uint8_t display : 2)
+	Type         uint8         // Blip type: 0=CONTACT_POINT, 1=COORD (1 bit, matches C++ uint8_t type : 1)
+	TrackingBlip uint8         // Whether it's a tracking blip (1 bit, matches C++ uint8_t trackingBlip : 1)
+	ShortRange   uint8         // Whether it's short range (1 bit, matches C++ uint8_t shortRange : 1)
+}
+
+// Marshal serializes the packet to binary format with C++ struct packing
+// Handle bitfields manually to match C++ layout exactly
+func (p *CreateStaticBlipPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	// Write position (CVector = 3 floats)
+	if err := binary.Write(buf, binary.LittleEndian, p.Position); err != nil {
+		return nil, err
+	}
+
+	// Write sprite (int8_t)
+	if err := binary.Write(buf, binary.LittleEndian, p.Sprite); err != nil {
+		return nil, err
+	}
+
+	// Pack bitfields into a single uint8 byte to match C++ layout
+	// C++ bitfields: display:2, type:1, trackingBlip:1, shortRange:1 (3 bits unused)
+	bitfield := uint8(0)
+	bitfield |= (p.Display & 0x03)           // bits 0-1: display (2 bits)
+	bitfield |= (p.Type & 0x01) << 2         // bit 2: type (1 bit)
+	bitfield |= (p.TrackingBlip & 0x01) << 3 // bit 3: trackingBlip (1 bit)
+	bitfield |= (p.ShortRange & 0x01) << 4   // bit 4: shortRange (1 bit)
+	// bits 5-7 are unused/padding
+
+	if err := binary.Write(buf, binary.LittleEndian, bitfield); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes binary data to packet with C++ struct packing
+// Handle bitfields manually to match C++ layout exactly
+func (p *CreateStaticBlipPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+
+	// Read position (CVector = 3 floats)
+	if err := binary.Read(buf, binary.LittleEndian, &p.Position); err != nil {
+		return err
+	}
+
+	// Read sprite (int8_t)
+	if err := binary.Read(buf, binary.LittleEndian, &p.Sprite); err != nil {
+		return err
+	}
+
+	// Read and unpack bitfields from single uint8 byte
+	var bitfield uint8
+	if err := binary.Read(buf, binary.LittleEndian, &bitfield); err != nil {
+		return err
+	}
+
+	// Unpack bitfields from the byte
+	p.Display = bitfield & 0x03             // bits 0-1: display (2 bits)
+	p.Type = (bitfield >> 2) & 0x01         // bit 2: type (1 bit)
+	p.TrackingBlip = (bitfield >> 3) & 0x01 // bit 3: trackingBlip (1 bit)
+	p.ShortRange = (bitfield >> 4) & 0x01   // bit 4: shortRange (1 bit)
+
+	return nil
+}
+
+// IsContactPoint returns true if the blip type is BLIP_CONTACT_POINT
+func (p *CreateStaticBlipPacket) IsContactPoint() bool {
+	return p.Type == 0
+}
+
+// IsCoord returns true if the blip type is BLIP_COORD
+func (p *CreateStaticBlipPacket) IsCoord() bool {
+	return p.Type == 1
+}
+
+// SetContactPoint sets the blip type to BLIP_CONTACT_POINT
+func (p *CreateStaticBlipPacket) SetContactPoint() {
+	p.Type = 0
+}
+
+// SetCoord sets the blip type to BLIP_COORD
+func (p *CreateStaticBlipPacket) SetCoord() {
+	p.Type = 1
+}
+
+// NewCreateStaticBlipPacket creates a new static blip creation packet
+func NewCreateStaticBlipPacket(position types.Vector3, sprite int8, display, blipType, trackingBlip, shortRange uint8) *CreateStaticBlipPacket {
+	return &CreateStaticBlipPacket{
+		Position:     position,
+		Sprite:       sprite,
+		Display:      display & 0x03,      // Ensure only 2 bits
+		Type:         blipType & 0x01,     // Ensure only 1 bit
+		TrackingBlip: trackingBlip & 0x01, // Ensure only 1 bit
+		ShortRange:   shortRange & 0x01,   // Ensure only 1 bit
+	}
+}

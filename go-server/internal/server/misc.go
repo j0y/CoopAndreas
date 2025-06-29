@@ -914,3 +914,77 @@ func (s *Server) handleRemoveCheckpoint(client *network.Client, data []byte) err
 
 	return nil
 }
+
+// isAllowedRadarSprite validates if a radar sprite ID is allowed for synchronization
+// This matches the C++ CNetworkStaticBlip::IsAllowedSyncingRadarSprite logic
+// Allowed ranges: 5-40, 42-55, 58-63
+func isAllowedRadarSprite(sprite int8) bool {
+	spriteID := int(sprite)
+	return (spriteID >= 5 && spriteID <= 40) || (spriteID >= 42 && spriteID <= 55) || (spriteID >= 58 && spriteID <= 63)
+}
+
+// handleCreateStaticBlip handles CREATE_STATIC_BLIP packets
+// This matches the C++ CPlayerPackets::CreateStaticBlip::Handle() functionality
+// Only the host player can create static blips, and it gets broadcast to all other clients
+func (s *Server) handleCreateStaticBlip(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Str("client", client.GetClientID()).
+			Msg("Non-host player attempted to create static blip")
+		return nil // Ignore non-host static blip creation
+	}
+
+	// Parse the packet
+	var packet packets.CreateStaticBlipPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal CreateStaticBlip packet: %w", err)
+	}
+
+	// Validate sprite ID (matching C++ IsAllowedSyncingRadarSprite logic)
+	if !isAllowedRadarSprite(packet.Sprite) {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Int8("sprite", packet.Sprite).
+			Msg("Host attempted to create static blip with invalid sprite ID")
+		return nil // Ignore invalid sprite IDs, matching C++ behavior
+	}
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Float32("posX", packet.Position.X).
+		Float32("posY", packet.Position.Y).
+		Float32("posZ", packet.Position.Z).
+		Int8("sprite", packet.Sprite).
+		Uint8("display", packet.Display).
+		Bool("isCoord", packet.IsCoord()).
+		Bool("trackingBlip", packet.TrackingBlip != 0).
+		Bool("shortRange", packet.ShortRange != 0).
+		Msg("Host creating static blip")
+
+	// Broadcast to all other clients (reliable packet, matching C++ logic)
+	// This matches C++ logic: CNetwork::SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal static blip creation packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.CREATE_STATIC_BLIP,
+		Data: packetData,
+		Flag: 1, // Reliable for static blip synchronization (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast static blip creation: %w", err)
+	}
+
+	return nil
+}
