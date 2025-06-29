@@ -338,3 +338,99 @@ func (s *Server) handleAddExplosion(client *network.Client, data []byte) error {
 
 	return nil
 }
+
+// handleStartCutscene handles START_CUTSCENE packets
+// This matches the C++ CPlayerPackets::StartCutscene::Handle() functionality
+// Only the host player can start cutscenes, and it gets broadcast to all other clients
+func (s *Server) handleStartCutscene(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Str("client", client.GetClientID()).
+			Msg("Non-host player attempted to start cutscene")
+		return nil // Ignore non-host cutscene requests
+	}
+
+	// Parse the packet
+	var packet packets.StartCutscenePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal StartCutscene packet: %w", err)
+	}
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Str("cutsceneName", packet.GetCutsceneName()).
+		Uint8("currArea", packet.CurrArea).
+		Msg("Host starting cutscene")
+
+	// Broadcast to all other clients (reliable packet, matching C++ logic)
+	// This matches C++ logic: CNetwork::SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal start cutscene packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.START_CUTSCENE,
+		Data: packetData,
+		Flag: 1, // Reliable for cutscene synchronization (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast start cutscene: %w", err)
+	}
+
+	return nil
+}
+
+// handleSkipCutscene handles SKIP_CUTSCENE packets
+// This matches the C++ CPlayerPackets::SkipCutscene::Handle() functionality
+// Any player can request to skip a cutscene, and it gets broadcast to all other clients
+func (s *Server) handleSkipCutscene(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.SkipCutscenePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal SkipCutscene packet: %w", err)
+	}
+
+	// Set the correct player ID (security measure - don't trust client)
+	packet.PlayerID = int32(player.ID)
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Int32("playerID", packet.PlayerID).
+		Int32("votes", packet.Votes).
+		Msg("Player requesting cutscene skip")
+
+	// Broadcast to all other clients (reliable packet, matching C++ logic)
+	// This matches C++ logic: CNetwork::SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal skip cutscene packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.SKIP_CUTSCENE,
+		Data: packetData,
+		Flag: 1, // Reliable for cutscene synchronization (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast skip cutscene: %w", err)
+	}
+
+	return nil
+}

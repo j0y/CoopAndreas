@@ -115,6 +115,10 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleOpCodeSync(client, packet.Data)
 	case types.PLAY_MISSION_AUDIO:
 		return s.handlePlayMissionAudio(client, packet.Data)
+	case types.START_CUTSCENE:
+		return s.handleStartCutscene(client, packet.Data)
+	case types.SKIP_CUTSCENE:
+		return s.handleSkipCutscene(client, packet.Data)
 	case types.MASS_PACKET_SEQUENCE:
 		return s.handleMassPacketSequence(client, packet.Data)
 	default:

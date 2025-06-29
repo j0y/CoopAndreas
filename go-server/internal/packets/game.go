@@ -417,3 +417,77 @@ func NewAddExplosionPacket(explosionType uint8, position types.Vector3, time int
 		IsVisible:   isVisible,
 	}
 }
+
+// StartCutscenePacket represents a start cutscene request
+// This matches the C++ CPackets::StartCutscene structure exactly
+type StartCutscenePacket struct {
+	Name     [8]byte // Cutscene name (8 chars, null-terminated)
+	CurrArea uint8   // Current area/interior ID
+}
+
+// Marshal serializes the packet to binary format
+func (p *StartCutscenePacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *StartCutscenePacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
+// GetCutsceneName returns the cutscene name as a string
+func (p *StartCutscenePacket) GetCutsceneName() string {
+	// Find the null terminator and return the string up to that point
+	for i, b := range p.Name {
+		if b == 0 {
+			return string(p.Name[:i])
+		}
+	}
+	return string(p.Name[:])
+}
+
+// SetCutsceneName sets the cutscene name (truncates if longer than 7 chars)
+func (p *StartCutscenePacket) SetCutsceneName(name string) {
+	// Clear the array first
+	for i := range p.Name {
+		p.Name[i] = 0
+	}
+
+	// Copy the name (max 7 chars to leave room for null terminator)
+	maxLen := len(p.Name) - 1
+	if len(name) < maxLen {
+		maxLen = len(name)
+	}
+	copy(p.Name[:], name[:maxLen])
+}
+
+// SkipCutscenePacket represents a skip cutscene request
+// This matches the C++ CPackets::SkipCutscene structure exactly
+type SkipCutscenePacket struct {
+	PlayerID int32 // Player ID who requested the skip
+	Votes    int32 // Voting system (currently unused, as per C++ comment)
+}
+
+// Marshal serializes the packet to binary format
+func (p *SkipCutscenePacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *SkipCutscenePacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
+// NewSkipCutscenePacket creates a new skip cutscene packet
+func NewSkipCutscenePacket(playerID int32, votes int32) *SkipCutscenePacket {
+	return &SkipCutscenePacket{
+		PlayerID: playerID,
+		Votes:    votes,
+	}
+}
