@@ -14,7 +14,7 @@ func (s *Server) handlePedSpawn(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -97,7 +97,7 @@ func (s *Server) handlePedRemove(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -153,7 +153,7 @@ func (s *Server) handlePedOnFoot(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Debug: Check packet size (expected: 59 bytes based on C++ struct)
@@ -207,7 +207,7 @@ func (s *Server) handlePedDriverUpdate(client *network.Client, data []byte) erro
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Debug: Check packet size
@@ -288,7 +288,7 @@ func (s *Server) handlePedAddTask(client *network.Client, data []byte) error {
 	if ped == nil {
 		s.logger.Warn().
 			Int32("pedID", pedID).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Add task packet for non-existent ped")
 		return nil // Ignore packets for non-existent peds
 	}
@@ -298,7 +298,7 @@ func (s *Server) handlePedAddTask(client *network.Client, data []byte) error {
 		Int32("taskID", taskID).
 		Uint8("taskSlot", taskSlot).
 		Bool("primary", bPrimary).
-		Str("client", client.GetClientID()).
+		Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 		Msg("Ped add task")
 
 	// Broadcast to all other clients (reliable packet)
@@ -330,7 +330,7 @@ func (s *Server) handlePedRemoveTask(client *network.Client, data []byte) error 
 	if ped == nil {
 		s.logger.Warn().
 			Int32("pedID", packet.PedID).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Remove task packet for non-existent ped")
 		return nil // Ignore packets for non-existent peds
 	}
@@ -338,7 +338,7 @@ func (s *Server) handlePedRemoveTask(client *network.Client, data []byte) error 
 	s.logger.Debug().
 		Int32("pedID", packet.PedID).
 		Int32("taskID", packet.TaskID).
-		Str("client", client.GetClientID()).
+		Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 		Msg("Ped remove task")
 
 	// Broadcast to all other clients (reliable packet)
@@ -366,7 +366,7 @@ func (s *Server) handlePedShotSync(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -380,7 +380,7 @@ func (s *Server) handlePedShotSync(client *network.Client, data []byte) error {
 	if ped == nil {
 		s.logger.Warn().
 			Int32("pedID", packet.PedID).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Shot sync packet for non-existent ped")
 		return nil // Ignore packets for non-existent peds
 	}
@@ -390,7 +390,7 @@ func (s *Server) handlePedShotSync(client *network.Client, data []byte) error {
 		s.logger.Warn().
 			Int32("pedID", packet.PedID).
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Player tries to sync shots for someone else's ped - possible hack or bug")
 		return nil // Ignore unauthorized shot sync packets
 	}
@@ -431,7 +431,7 @@ func (s *Server) handlePedPassengerUpdate(client *network.Client, data []byte) e
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -445,7 +445,7 @@ func (s *Server) handlePedPassengerUpdate(client *network.Client, data []byte) e
 	if ped == nil {
 		s.logger.Warn().
 			Int32("pedID", packet.PedID).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Passenger update packet for non-existent ped")
 		return nil // Ignore packets for non-existent peds
 	}
@@ -455,7 +455,7 @@ func (s *Server) handlePedPassengerUpdate(client *network.Client, data []byte) e
 		s.logger.Warn().
 			Int32("pedID", packet.PedID).
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Player tries to sync passenger status for someone else's ped - possible hack or bug")
 		return nil // Ignore unauthorized passenger updates
 	}

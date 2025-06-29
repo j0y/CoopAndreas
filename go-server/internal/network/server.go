@@ -41,11 +41,6 @@ func NewClient(playerID types.PlayerID, addr *net.UDPAddr) *Client {
 	}
 }
 
-// GetClientID returns a unique string identifier for this client
-func (c *Client) GetClientID() string {
-	return fmt.Sprintf("%d", c.PlayerID)
-}
-
 // NetworkPacket represents a network packet
 type NetworkPacket struct {
 	ID   types.PacketID

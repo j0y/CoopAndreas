@@ -14,7 +14,7 @@ func (s *Server) handleVehicleSpawn(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -204,7 +204,7 @@ func (s *Server) handleVehicleRemove(client *network.Client, data []byte) error 
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -273,7 +273,7 @@ func (s *Server) handleVehicleIdleUpdate(client *network.Client, data []byte) er
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -350,7 +350,7 @@ func (s *Server) handleVehicleDriverUpdate(client *network.Client, data []byte) 
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -449,7 +449,7 @@ func (s *Server) handleVehicleEnter(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -565,7 +565,7 @@ func (s *Server) handleVehicleExit(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -666,7 +666,7 @@ func (s *Server) handleVehiclePassengerUpdate(client *network.Client, data []byt
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -751,7 +751,7 @@ func (s *Server) handleVehicleDamage(client *network.Client, data []byte) error 
 	if vehicle == nil {
 		s.logger.Warn().
 			Int32("vehicleID", packet.VehicleID).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Vehicle damage packet for non-existent vehicle")
 		return nil // Ignore damage packets for non-existent vehicles
 	}
@@ -761,7 +761,7 @@ func (s *Server) handleVehicleDamage(client *network.Client, data []byte) error 
 
 	s.logger.Debug().
 		Int32("vehicleID", packet.VehicleID).
-		Str("client", client.GetClientID()).
+		Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 		Msg("Vehicle damage updated")
 
 	// Broadcast to all other clients (reliable packet)
@@ -797,7 +797,7 @@ func (s *Server) handleVehicleComponentAdd(client *network.Client, data []byte) 
 	if vehicle == nil {
 		s.logger.Warn().
 			Int32("vehicleID", packet.VehicleID).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Vehicle component add packet for non-existent vehicle")
 		return nil // Ignore packets for non-existent vehicles
 	}
@@ -808,7 +808,7 @@ func (s *Server) handleVehicleComponentAdd(client *network.Client, data []byte) 
 	s.logger.Debug().
 		Int32("vehicleID", packet.VehicleID).
 		Int32("componentID", packet.ComponentID).
-		Str("client", client.GetClientID()).
+		Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 		Msg("Vehicle component added")
 
 	// Broadcast to all other clients (reliable packet)
@@ -844,7 +844,7 @@ func (s *Server) handleVehicleComponentRemove(client *network.Client, data []byt
 	if vehicle == nil {
 		s.logger.Warn().
 			Int32("vehicleID", packet.VehicleID).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Vehicle component remove packet for non-existent vehicle")
 		return nil // Ignore packets for non-existent vehicles
 	}
@@ -855,7 +855,7 @@ func (s *Server) handleVehicleComponentRemove(client *network.Client, data []byt
 	s.logger.Debug().
 		Int32("vehicleID", packet.VehicleID).
 		Int32("componentID", packet.ComponentID).
-		Str("client", client.GetClientID()).
+		Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 		Msg("Vehicle component removed")
 
 	// Broadcast to all other clients (reliable packet)
@@ -893,14 +893,14 @@ func (s *Server) handleAssignVehicle(client *network.Client, data []byte) error 
 	if vehicle == nil {
 		s.logger.Debug().
 			Int32("vehicleID", packet.VehicleID).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("AssignVehicle packet for non-existent vehicle")
 		return nil // Ignore packets for non-existent vehicles
 	}
 
 	s.logger.Debug().
 		Int32("vehicleID", packet.VehicleID).
-		Str("client", client.GetClientID()).
+		Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 		Msg("Received AssignVehicle packet (client-side handling)")
 
 	// Note: This packet is typically handled on the client side to toggle
@@ -934,7 +934,7 @@ func (s *Server) sendAssignVehiclePacket(client *network.Client, vehicleID types
 
 	s.logger.Debug().
 		Int32("vehicleID", int32(vehicleID)).
-		Str("client", client.GetClientID()).
+		Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 		Msg("Sent AssignVehicle packet")
 
 	return nil

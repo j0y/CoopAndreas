@@ -43,7 +43,7 @@ func (s *Server) handleGameWeatherTime(client *network.Client, data []byte) erro
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (!CPlayerManager::GetPlayer(peer)->m_bIsHost) return;)
@@ -187,7 +187,7 @@ func (s *Server) handleOpCodeSync(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (!CPlayerManager::GetPlayer(peer)->m_bIsHost) return;)
@@ -238,7 +238,7 @@ func (s *Server) handlePlayMissionAudio(client *network.Client, data []byte) err
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (!player->m_bIsHost) return;)
@@ -298,7 +298,7 @@ func (s *Server) handleAddExplosion(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -346,14 +346,14 @@ func (s *Server) handleStartCutscene(client *network.Client, data []byte) error 
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to start cutscene")
 		return nil // Ignore non-host cutscene requests
 	}
@@ -397,7 +397,7 @@ func (s *Server) handleSkipCutscene(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Parse the packet
@@ -442,14 +442,14 @@ func (s *Server) handleOnMissionFlagSync(client *network.Client, data []byte) er
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to sync mission flag")
 		return nil // Ignore non-host mission flag sync requests
 	}
@@ -492,14 +492,14 @@ func (s *Server) handleUpdateEntityBlip(client *network.Client, data []byte) err
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to update entity blip")
 		return nil // Ignore non-host entity blip updates
 	}
@@ -555,14 +555,14 @@ func (s *Server) handleRemoveEntityBlip(client *network.Client, data []byte) err
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to remove entity blip")
 		return nil // Ignore non-host entity blip removals
 	}
@@ -616,14 +616,14 @@ func (s *Server) handleAddMessageGXT(client *network.Client, data []byte) error 
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to add GXT message")
 		return nil // Ignore non-host GXT message additions
 	}
@@ -679,14 +679,14 @@ func (s *Server) handleRemoveMessageGXT(client *network.Client, data []byte) err
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to remove GXT message")
 		return nil // Ignore non-host GXT message removals
 	}
@@ -739,14 +739,14 @@ func (s *Server) handleClearEntityBlips(client *network.Client, data []byte) err
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to clear entity blips")
 		return nil // Ignore non-host entity blip clearing
 	}
@@ -798,14 +798,14 @@ func (s *Server) handleUpdateCheckpoint(client *network.Client, data []byte) err
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to update checkpoint")
 		return nil // Ignore non-host checkpoint updates
 	}
@@ -863,14 +863,14 @@ func (s *Server) handleRemoveCheckpoint(client *network.Client, data []byte) err
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to remove checkpoint")
 		return nil // Ignore non-host checkpoint removals
 	}
@@ -930,14 +930,14 @@ func (s *Server) handleCreateStaticBlip(client *network.Client, data []byte) err
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to create static blip")
 		return nil // Ignore non-host static blip creation
 	}
@@ -997,14 +997,14 @@ func (s *Server) handleEnExSync(client *network.Client, data []byte) error {
 	// Get player associated with this client
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
-		return fmt.Errorf("no player found for client %s", client.GetClientID())
+		return fmt.Errorf("no player found for client %s", fmt.Sprintf("player_%d", client.PlayerID))
 	}
 
 	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
 	if !player.IsHost {
 		s.logger.Warn().
 			Str("player", player.Name).
-			Str("client", client.GetClientID()).
+			Str("client", fmt.Sprintf("player_%d", client.PlayerID)).
 			Msg("Non-host player attempted to send ENEX sync")
 		return nil // Ignore non-host ENEX sync
 	}
