@@ -67,6 +67,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handlePedRemoveTask(client, packet.Data)
 	case types.PED_SHOT_SYNC:
 		return s.handlePedShotSync(client, packet.Data)
+	case types.PED_PASSENGER_UPDATE:
+		return s.handlePedPassengerUpdate(client, packet.Data)
 	case types.PED_DRIVER_UPDATE:
 		return s.handlePedDriverUpdate(client, packet.Data)
 	case types.PLAYER_KEY_SYNC:

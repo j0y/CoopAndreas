@@ -555,3 +555,41 @@ func NewPedShotSyncPacket(pedID int32, origin, effect, target types.Vector3) *Pe
 		Target: target,
 	}
 }
+
+// PedPassengerUpdatePacket represents a packet for synchronizing ped passenger status
+// This matches the C++ CPackets::PedPassengerSync structure exactly
+type PedPassengerUpdatePacket struct {
+	PedID     int32  // Ped ID (matches C++ int pedid)
+	VehicleID int32  // Vehicle ID (matches C++ int vehicleid)
+	Health    uint8  // Ped health (matches C++ unsigned char health)
+	Armour    uint8  // Ped armour (matches C++ unsigned char armour)
+	Weapon    uint8  // Current weapon (matches C++ unsigned char weapon)
+	Ammo      uint16 // Current ammo (matches C++ unsigned short ammo)
+	SeatID    uint8  // Seat ID in vehicle (matches C++ unsigned char seatid)
+}
+
+// Marshal serializes the packet to binary format
+func (p *PedPassengerUpdatePacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PedPassengerUpdatePacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
+// NewPedPassengerUpdatePacket creates a new ped passenger update packet
+func NewPedPassengerUpdatePacket(pedID, vehicleID int32, health, armour, weapon uint8, ammo uint16, seatID uint8) *PedPassengerUpdatePacket {
+	return &PedPassengerUpdatePacket{
+		PedID:     pedID,
+		VehicleID: vehicleID,
+		Health:    health,
+		Armour:    armour,
+		Weapon:    weapon,
+		Ammo:      ammo,
+		SeatID:    seatID,
+	}
+}

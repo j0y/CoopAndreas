@@ -426,6 +426,71 @@ func (s *Server) handlePedShotSync(client *network.Client, data []byte) error {
 	return nil
 }
 
+// handlePedPassengerUpdate handles PED_PASSENGER_UPDATE packets
+func (s *Server) handlePedPassengerUpdate(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.PedPassengerUpdatePacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PedPassengerUpdate packet: %w", err)
+	}
+
+	// Get the ped
+	ped := s.pedManager.GetPed(types.PedID(packet.PedID))
+	if ped == nil {
+		s.logger.Warn().
+			Int32("pedID", packet.PedID).
+			Str("client", client.GetClientID()).
+			Msg("Passenger update packet for non-existent ped")
+		return nil // Ignore packets for non-existent peds
+	}
+
+	// Validate that only the ped's syncer can send passenger updates (matching C++ logic)
+	if ped.Syncer == nil || ped.Syncer.ID != player.ID {
+		s.logger.Warn().
+			Int32("pedID", packet.PedID).
+			Str("player", player.Name).
+			Str("client", client.GetClientID()).
+			Msg("Player tries to sync passenger status for someone else's ped - possible hack or bug")
+		return nil // Ignore unauthorized passenger updates
+	}
+
+	s.logger.Debug().
+		Int32("pedID", packet.PedID).
+		Int32("vehicleID", packet.VehicleID).
+		Uint8("health", packet.Health).
+		Uint8("armour", packet.Armour).
+		Uint8("weapon", packet.Weapon).
+		Uint16("ammo", packet.Ammo).
+		Uint8("seatID", packet.SeatID).
+		Str("player", player.Name).
+		Msg("Ped passenger update")
+
+	// Broadcast to all other clients (unreliable packet)
+	// This matches C++ logic: SendPacketToAll with (ENetPacketFlag)0 (unreliable)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal ped passenger update packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PED_PASSENGER_UPDATE,
+		Data: packetData,
+		Flag: 0, // Unreliable for frequent passenger updates (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast ped passenger update: %w", err)
+	}
+
+	return nil
+}
+
 // sendExistingPedsTo sends information about all existing peds to a new player
 func (s *Server) sendExistingPedsTo(client *network.Client) {
 	allPeds := s.pedManager.GetAllPeds()
