@@ -180,5 +180,5 @@ func (s *Server) getClientByPlayerID(playerID types.PlayerID) *network.Client {
 
 // GetFreePlayerID implements network.GameServer interface
 func (s *Server) GetFreePlayerID() types.PlayerID {
-	return s.generatePlayerID()
+	return s.playerManager.GetFreeID()
 }

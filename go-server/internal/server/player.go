@@ -181,11 +181,6 @@ func (s *Server) handlePlayerKeySync(client *network.Client, data []byte) error 
 	return nil
 }
 
-// generatePlayerID generates a unique player ID using GetFreeID (matching C++ logic)
-func (s *Server) generatePlayerID() types.PlayerID {
-	return s.playerManager.GetFreeID()
-}
-
 // broadcastPlayerConnectedPacket sends a PlayerConnected packet to all players except the specified client
 func (s *Server) broadcastPlayerConnectedPacket(packet *packets.PlayerConnectedPacket, excludeClient *network.Client) {
 	packetData, err := packet.Marshal()

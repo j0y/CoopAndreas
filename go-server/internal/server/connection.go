@@ -10,11 +10,8 @@ import (
 )
 
 // HandlePlayerConnect handles when a player connects
-func (s *Server) HandlePlayerConnect(client *network.Client) {
-	// Generate a unique player ID (similar to C++ GetFreeID())
-	playerID := s.generatePlayerID()
-
-	// Create a new player with default name
+func (s *Server) HandlePlayerConnect(client *network.Client, playerID types.PlayerID) {
+	// Create a new player with the provided player ID
 	player := &entities.Player{
 		ID:       playerID,
 		Name:     fmt.Sprintf("Player_%d", int(playerID)),

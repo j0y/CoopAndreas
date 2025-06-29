@@ -75,7 +75,7 @@ func UnmarshalPacket(data []byte) (*NetworkPacket, error) {
 // GameServer represents the game server that handles packets
 type GameServer interface {
 	HandlePacket(client *Client, packet *NetworkPacket) error
-	HandlePlayerConnect(client *Client)
+	HandlePlayerConnect(client *Client, playerID types.PlayerID)
 	HandlePlayerDisconnect(client *Client)
 	GetFreePlayerID() types.PlayerID // Get the next available player ID
 }
@@ -250,7 +250,7 @@ func (s *Server) handleConnect(event enet.Event) {
 		Msg("ENet client connected")
 
 	// Call the connection handler
-	s.gameServer.HandlePlayerConnect(client)
+	s.gameServer.HandlePlayerConnect(client, playerID)
 }
 
 // handleDisconnect handles peer disconnections
