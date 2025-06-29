@@ -523,3 +523,35 @@ func NewPedRemoveTaskPacket(pedID int32, taskID int32) *PedRemoveTaskPacket {
 		TaskID: taskID,
 	}
 }
+
+// PedShotSyncPacket represents a packet for synchronizing ped weapon shots
+// This matches the C++ CPackets::PedShotSync structure exactly
+type PedShotSyncPacket struct {
+	PedID  int32         // Ped ID (matches C++ int pedid)
+	Origin types.Vector3 // Shot origin position (matches C++ CVector origin)
+	Effect types.Vector3 // Shot effect position (matches C++ CVector effect)
+	Target types.Vector3 // Shot target position (matches C++ CVector target)
+}
+
+// Marshal serializes the packet to binary format
+func (p *PedShotSyncPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PedShotSyncPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
+// NewPedShotSyncPacket creates a new ped shot sync packet
+func NewPedShotSyncPacket(pedID int32, origin, effect, target types.Vector3) *PedShotSyncPacket {
+	return &PedShotSyncPacket{
+		PedID:  pedID,
+		Origin: origin,
+		Effect: effect,
+		Target: target,
+	}
+}
