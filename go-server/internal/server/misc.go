@@ -100,7 +100,7 @@ func (s *Server) sendCurrentWeatherTimeTo(client *network.Client) error {
 	// Only send if we have current weather/time state
 	if s.currentWeatherTime == nil {
 		s.logger.Debug().
-			Uint32("clientID", client.ID).
+			Uint32("playerID", uint32(client.PlayerID)).
 			Msg("No current weather/time state to send to new client")
 		return nil
 	}
@@ -123,7 +123,7 @@ func (s *Server) sendCurrentWeatherTimeTo(client *network.Client) error {
 	}
 
 	s.logger.Debug().
-		Uint32("clientID", client.ID).
+		Uint32("playerID", uint32(client.PlayerID)).
 		Uint8("newWeather", s.currentWeatherTime.NewWeather).
 		Uint8("currentHour", s.currentWeatherTime.CurrentHour).
 		Uint8("currentMinute", s.currentWeatherTime.CurrentMinute).

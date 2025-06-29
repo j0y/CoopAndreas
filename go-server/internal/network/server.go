@@ -27,23 +27,23 @@ const (
 
 // Client represents a connected client
 type Client struct {
-	ID   uint32 // Unique client ID
-	Addr *net.UDPAddr
+	PlayerID types.PlayerID // Player ID (matching C++ m_iPlayerId)
+	Addr     *net.UDPAddr
 	// ENet support (required for ENet clients)
 	ENetPeer interface{} // Holds enet.Peer for ENet clients
 }
 
 // NewClient creates a new client instance
-func NewClient(id uint32, addr *net.UDPAddr) *Client {
+func NewClient(playerID types.PlayerID, addr *net.UDPAddr) *Client {
 	return &Client{
-		ID:   id,
-		Addr: addr,
+		PlayerID: playerID,
+		Addr:     addr,
 	}
 }
 
 // GetClientID returns a unique string identifier for this client
 func (c *Client) GetClientID() string {
-	return fmt.Sprintf("%d", c.ID)
+	return fmt.Sprintf("%d", c.PlayerID)
 }
 
 // NetworkPacket represents a network packet
@@ -77,18 +77,18 @@ type GameServer interface {
 	HandlePacket(client *Client, packet *NetworkPacket) error
 	HandlePlayerConnect(client *Client)
 	HandlePlayerDisconnect(client *Client)
+	GetFreePlayerID() types.PlayerID // Get the next available player ID
 }
 
 // Server represents the ENet-compatible server (replaces old UDP server)
 type Server struct {
 	host         enet.Host
-	clients      map[uint32]*Client
+	clients      map[types.PlayerID]*Client // Map by PlayerID (matching C++ approach)
 	clientsMutex sync.RWMutex
 	gameServer   GameServer
 	running      bool
 	runningMutex sync.RWMutex
 	logger       zerolog.Logger
-	nextClientID uint32
 }
 
 // NewServer creates a new ENet-compatible server
@@ -101,10 +101,9 @@ func NewServer(port int, gameServer GameServer) *Server {
 		Logger()
 
 	return &Server{
-		clients:      make(map[uint32]*Client),
-		gameServer:   gameServer,
-		logger:       logger,
-		nextClientID: 1,
+		clients:    make(map[types.PlayerID]*Client),
+		gameServer: gameServer,
+		logger:     logger,
 	}
 }
 
@@ -189,8 +188,14 @@ func (s *Server) run() {
 // handleConnect handles new peer connections
 func (s *Server) handleConnect(event enet.Event) {
 	peer := event.GetPeer()
-	clientID := s.nextClientID
-	s.nextClientID++
+
+	// Get free player ID from game server (matching C++ CPlayerManager::GetFreeID())
+	playerID := s.gameServer.GetFreePlayerID()
+	if playerID == -1 {
+		s.logger.Warn().Msg("Server is full - disconnecting client")
+		peer.Disconnect(0)
+		return
+	}
 
 	// Get actual client address from ENet peer
 	enetAddr := peer.GetAddress()
@@ -225,20 +230,20 @@ func (s *Server) handleConnect(event enet.Event) {
 		}
 	}
 
-	client := NewClient(clientID, udpAddr)
+	client := NewClient(playerID, udpAddr)
 	client.ENetPeer = peer // Store the ENet peer for sending packets
 
 	s.clientsMutex.Lock()
-	s.clients[clientID] = client
+	s.clients[playerID] = client
 	s.clientsMutex.Unlock()
 
-	// Store client ID in peer data (as bytes)
-	clientIDBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(clientIDBytes, clientID)
-	peer.SetData(clientIDBytes)
+	// Store player ID in peer data (as bytes, matching C++ approach)
+	playerIDBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(playerIDBytes, uint32(playerID))
+	peer.SetData(playerIDBytes)
 
 	s.logger.Info().
-		Uint32("clientID", clientID).
+		Int32("playerID", int32(playerID)).
 		Str("clientAddr", client.Addr.String()).
 		Str("enetAddr", addrStr).
 		Uint16("port", port).
@@ -251,25 +256,25 @@ func (s *Server) handleConnect(event enet.Event) {
 // handleDisconnect handles peer disconnections
 func (s *Server) handleDisconnect(event enet.Event) {
 	peer := event.GetPeer()
-	clientIDBytes := peer.GetData()
+	playerIDBytes := peer.GetData()
 
-	if len(clientIDBytes) < 4 {
-		s.logger.Warn().Msg("Invalid client ID data on disconnect")
+	if len(playerIDBytes) < 4 {
+		s.logger.Warn().Msg("Invalid player ID data on disconnect")
 		return
 	}
 
-	clientID := binary.LittleEndian.Uint32(clientIDBytes)
+	playerID := types.PlayerID(binary.LittleEndian.Uint32(playerIDBytes))
 
 	s.clientsMutex.Lock()
-	client, exists := s.clients[clientID]
+	client, exists := s.clients[playerID]
 	if exists {
-		delete(s.clients, clientID)
+		delete(s.clients, playerID)
 	}
 	s.clientsMutex.Unlock()
 
 	if exists {
 		s.logger.Info().
-			Uint32("clientID", clientID).
+			Int32("playerID", int32(playerID)).
 			Msg("ENet client disconnected")
 
 		// Call the disconnection handler
@@ -283,21 +288,21 @@ func (s *Server) handleDisconnect(event enet.Event) {
 // handleReceive handles received packets
 func (s *Server) handleReceive(event enet.Event) {
 	peer := event.GetPeer()
-	clientIDBytes := peer.GetData()
+	playerIDBytes := peer.GetData()
 
-	if len(clientIDBytes) < 4 {
-		s.logger.Warn().Msg("Invalid client ID data on receive")
+	if len(playerIDBytes) < 4 {
+		s.logger.Warn().Msg("Invalid player ID data on receive")
 		return
 	}
 
-	clientID := binary.LittleEndian.Uint32(clientIDBytes)
+	playerID := types.PlayerID(binary.LittleEndian.Uint32(playerIDBytes))
 
 	s.clientsMutex.RLock()
-	client, exists := s.clients[clientID]
+	client, exists := s.clients[playerID]
 	s.clientsMutex.RUnlock()
 
 	if !exists {
-		s.logger.Warn().Uint32("clientID", clientID).Msg("Received packet from unknown client")
+		s.logger.Warn().Int32("playerID", int32(playerID)).Msg("Received packet from unknown client")
 		return
 	}
 
@@ -306,14 +311,14 @@ func (s *Server) handleReceive(event enet.Event) {
 
 	gamePacket, err := UnmarshalPacket(data)
 	if err != nil {
-		s.logger.Error().Err(err).Uint32("clientID", clientID).Msg("Failed to unmarshal game packet")
+		s.logger.Error().Err(err).Int32("playerID", int32(playerID)).Msg("Failed to unmarshal game packet")
 		packet.Destroy()
 		return
 	}
 
 	//s.logger.Debug().
 	//	Uint16("packetID", uint16(gamePacket.ID)).
-	//	Uint32("clientID", clientID).
+	//	Int32("playerID", int32(playerID)).
 	//	Msg("Received ENet packet")
 
 	// Handle the packet
@@ -321,7 +326,7 @@ func (s *Server) handleReceive(event enet.Event) {
 		s.logger.Error().
 			Err(err).
 			Uint16("packetID", uint16(gamePacket.ID)).
-			Uint32("clientID", clientID).
+			Int32("playerID", int32(playerID)).
 			Msg("Error handling packet")
 	}
 
@@ -370,7 +375,7 @@ func (s *Server) BroadcastPacket(packet *NetworkPacket) {
 		if err := s.SendPacket(client, packet); err != nil {
 			s.logger.Error().
 				Err(err).
-				Uint32("clientID", client.ID).
+				Int32("playerID", int32(client.PlayerID)).
 				Msg("Failed to broadcast packet to client")
 		}
 	}
@@ -382,11 +387,11 @@ func (s *Server) BroadcastPacketExclude(packet *NetworkPacket, excludeClient *Cl
 	defer s.clientsMutex.RUnlock()
 
 	for _, client := range s.clients {
-		if client.ID != excludeClient.ID {
+		if client.PlayerID != excludeClient.PlayerID {
 			if err := s.SendPacket(client, packet); err != nil {
 				s.logger.Error().
 					Err(err).
-					Uint32("clientID", client.ID).
+					Int32("playerID", int32(client.PlayerID)).
 					Msg("Failed to broadcast packet to client")
 			}
 		}

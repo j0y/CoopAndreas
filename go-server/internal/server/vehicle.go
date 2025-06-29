@@ -157,10 +157,9 @@ func (s *Server) sendExistingVehiclesTo(client *network.Client) {
 			if err := s.networkServer.SendPacket(client, damageNetworkPacket); err != nil {
 				s.logger.Error().Err(err).Msg("Failed to send vehicle damage packet")
 			}
-
 			s.logger.Debug().
 				Int32("vehicleID", int32(vehicle.ID)).
-				Uint32("clientID", client.ID).
+				Uint32("playerID", uint32(client.PlayerID)).
 				Msg("Sent vehicle damage data to new player")
 		}
 
@@ -186,17 +185,16 @@ func (s *Server) sendExistingVehiclesTo(client *network.Client) {
 			if err := s.networkServer.SendPacket(client, componentNetworkPacket); err != nil {
 				s.logger.Error().Err(err).Msg("Failed to send vehicle component packet")
 			}
-
 			s.logger.Debug().
 				Int32("vehicleID", int32(vehicle.ID)).
 				Int32("componentID", componentID).
-				Uint32("clientID", client.ID).
+				Uint32("playerID", uint32(client.PlayerID)).
 				Msg("Sent vehicle component to new player")
 		}
 
 		s.logger.Debug().
 			Int32("vehicleID", int32(vehicle.ID)).
-			Uint32("clientID", client.ID).
+			Uint32("playerID", uint32(client.PlayerID)).
 			Msg("Sent existing vehicle info to new player")
 	}
 }

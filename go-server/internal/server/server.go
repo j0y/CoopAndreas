@@ -146,7 +146,7 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 	default:
 		s.logger.Debug().
 			Uint16("packetID", uint16(packet.ID)).
-			Uint32("clientID", client.ID).
+			Uint32("playerID", uint32(client.PlayerID)).
 			Msg("Unhandled packet type")
 		return nil
 	}
@@ -176,4 +176,9 @@ func (s *Server) getClientByPlayerID(playerID types.PlayerID) *network.Client {
 		return nil
 	}
 	return s.networkServer.GetClient(player.PeerAddr)
+}
+
+// GetFreePlayerID implements network.GameServer interface
+func (s *Server) GetFreePlayerID() types.PlayerID {
+	return s.generatePlayerID()
 }

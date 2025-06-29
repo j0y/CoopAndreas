@@ -165,3 +165,30 @@ func (pm *PlayerManager) GetPlayerByID(playerID types.PlayerID) *Player {
 	}
 	return nil
 }
+
+// GetFreeID finds the first available player ID (matching C++ CPlayerManager::GetFreeID)
+func (pm *PlayerManager) GetFreeID() types.PlayerID {
+	const maxPlayers = 32
+
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
+
+	for i := 0; i < maxPlayers; i++ {
+		playerID := types.PlayerID(i)
+		found := false
+
+		// Check if this ID is already in use
+		for _, player := range pm.players {
+			if player.ID == playerID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return playerID // Return first free ID
+		}
+	}
+
+	return -1 // Server is full (matching C++ return -1)
+}

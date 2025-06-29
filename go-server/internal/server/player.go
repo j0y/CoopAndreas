@@ -25,7 +25,7 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		s.logger.Warn().
-			Uint32("clientID", client.ID).
+			Uint32("playerID", uint32(client.PlayerID)).
 			Str("name", playerName).
 			Msg("Received name from unknown player")
 		return fmt.Errorf("no player found for client %s", client.Addr)
@@ -36,7 +36,7 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 	player.Name = playerName
 
 	s.logger.Info().
-		Uint32("clientID", client.ID).
+		Uint32("playerID", uint32(client.PlayerID)).
 		Str("oldName", oldName).
 		Str("newName", playerName).
 		Int32("playerID", int32(player.ID)).
@@ -145,7 +145,7 @@ func (s *Server) handlePlayerKeySync(client *network.Client, data []byte) error 
 			Err(err).
 			Int("dataSize", len(data)).
 			Str("dataHex", fmt.Sprintf("%x", data)).
-			Uint32("clientID", client.ID).
+			Uint32("playerID", uint32(client.PlayerID)).
 			Msg("Failed to unmarshal PLAYER_KEY_SYNC packet")
 		return fmt.Errorf("failed to unmarshal PlayerKeySync packet: %w", err)
 	}
@@ -181,10 +181,9 @@ func (s *Server) handlePlayerKeySync(client *network.Client, data []byte) error 
 	return nil
 }
 
-// generatePlayerID generates a unique player ID (similar to C++ GetFreeID())
+// generatePlayerID generates a unique player ID using GetFreeID (matching C++ logic)
 func (s *Server) generatePlayerID() types.PlayerID {
-	allPlayers := s.playerManager.GetAllPlayers()
-	return types.PlayerID(len(allPlayers) + 1)
+	return s.playerManager.GetFreeID()
 }
 
 // broadcastPlayerConnectedPacket sends a PlayerConnected packet to all players except the specified client
@@ -379,7 +378,7 @@ func (s *Server) sendHandshakeTo(client *network.Client, handshakePacket *packet
 
 	s.logger.Info().
 		Int32("playerID", int32(handshakePacket.YourID)).
-		Uint32("clientID", client.ID).
+		Uint32("playerID", uint32(client.PlayerID)).
 		Msg("Sent handshake packet to new player")
 }
 
@@ -395,7 +394,7 @@ func (s *Server) handlePlayerSetHost(client *network.Client, data []byte) error 
 
 	s.logger.Info().
 		Int32("hostPlayerID", int32(packet.ID)).
-		Uint32("clientID", client.ID).
+		Uint32("playerID", uint32(client.PlayerID)).
 		Msg("Received PlayerSetHost packet (unusual - typically server-to-client)")
 
 	// Note: In the C++ implementation, this packet is typically sent FROM server TO clients
