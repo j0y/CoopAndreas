@@ -429,3 +429,10 @@ func (s *Server) GetClient(clientAddr string) *Client {
 
 	return nil
 }
+
+// GetClientByPlayerID returns a client by its player ID
+func (s *Server) GetClientByPlayerID(playerID types.PlayerID) *Client {
+	s.clientsMutex.RLock()
+	defer s.clientsMutex.RUnlock()
+	return s.clients[playerID]
+}

@@ -169,13 +169,9 @@ func (s *Server) getClientByPlayer(player *entities.Player) *network.Client {
 }
 
 // getClientByPlayerID finds the network client associated with a specific player ID
-// This combines GetPlayerByID + getClientByPlayer into a single call with proper error handling
+// Now simplified since client.PlayerID matches the player ID directly
 func (s *Server) getClientByPlayerID(playerID types.PlayerID) *network.Client {
-	player := s.playerManager.GetPlayerByID(playerID)
-	if player == nil {
-		return nil
-	}
-	return s.networkServer.GetClient(player.PeerAddr)
+	return s.networkServer.GetClientByPlayerID(playerID)
 }
 
 // GetFreePlayerID implements network.GameServer interface
