@@ -27,9 +27,8 @@ const (
 
 // Client represents a connected client
 type Client struct {
-	ID    uint32 // Unique client ID
-	Addr  *net.UDPAddr
-	mutex sync.RWMutex
+	ID   uint32 // Unique client ID
+	Addr *net.UDPAddr
 	// ENet support (required for ENet clients)
 	ENetPeer interface{} // Holds enet.Peer for ENet clients
 }
