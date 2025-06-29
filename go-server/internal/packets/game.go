@@ -491,3 +491,44 @@ func NewSkipCutscenePacket(playerID int32, votes int32) *SkipCutscenePacket {
 		Votes:    votes,
 	}
 }
+
+// OnMissionFlagSyncPacket represents mission flag synchronization
+// This matches the C++ CPackets::OnMissionFlagSync structure exactly
+// Note: C++ uses bitfield (uint8_t bOnMission : 1), but we use full uint8 for simplicity
+type OnMissionFlagSyncPacket struct {
+	OnMission uint8 // 1 if player is on mission, 0 if not (matches C++ bitfield behavior)
+}
+
+// Marshal serializes the packet to binary format
+func (p *OnMissionFlagSyncPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p.OnMission)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *OnMissionFlagSyncPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, &p.OnMission)
+}
+
+// IsOnMission returns true if player is on a mission
+func (p *OnMissionFlagSyncPacket) IsOnMission() bool {
+	return p.OnMission != 0
+}
+
+// SetOnMission sets the mission flag
+func (p *OnMissionFlagSyncPacket) SetOnMission(onMission bool) {
+	if onMission {
+		p.OnMission = 1
+	} else {
+		p.OnMission = 0
+	}
+}
+
+// NewOnMissionFlagSyncPacket creates a new mission flag sync packet
+func NewOnMissionFlagSyncPacket(onMission bool) *OnMissionFlagSyncPacket {
+	packet := &OnMissionFlagSyncPacket{}
+	packet.SetOnMission(onMission)
+	return packet
+}

@@ -434,3 +434,53 @@ func (s *Server) handleSkipCutscene(client *network.Client, data []byte) error {
 
 	return nil
 }
+
+// handleOnMissionFlagSync handles ON_MISSION_FLAG_SYNC packets
+// This matches the C++ CPlayerPackets::OnMissionFlagSync::Handle() functionality
+// Only the host player can sync mission flags, and it gets broadcast to all other clients
+func (s *Server) handleOnMissionFlagSync(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Str("client", client.GetClientID()).
+			Msg("Non-host player attempted to sync mission flag")
+		return nil // Ignore non-host mission flag sync requests
+	}
+
+	// Parse the packet
+	var packet packets.OnMissionFlagSyncPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal OnMissionFlagSync packet: %w", err)
+	}
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Bool("onMission", packet.IsOnMission()).
+		Msg("Host syncing mission flag")
+
+	// Broadcast to all other clients (reliable packet, matching C++ logic)
+	// This matches C++ logic: CNetwork::SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal mission flag sync packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.ON_MISSION_FLAG_SYNC,
+		Data: packetData,
+		Flag: 1, // Reliable for mission synchronization (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast mission flag sync: %w", err)
+	}
+
+	return nil
+}

@@ -119,6 +119,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleStartCutscene(client, packet.Data)
 	case types.SKIP_CUTSCENE:
 		return s.handleSkipCutscene(client, packet.Data)
+	case types.ON_MISSION_FLAG_SYNC:
+		return s.handleOnMissionFlagSync(client, packet.Data)
 	case types.MASS_PACKET_SEQUENCE:
 		return s.handleMassPacketSequence(client, packet.Data)
 	default:
