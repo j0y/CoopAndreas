@@ -519,31 +519,13 @@ func (s *Server) handleUpdateEntityBlip(client *network.Client, data []byte) err
 		Uint8("color", packet.Color).
 		Msg("Host updating entity blip")
 
-	// Find the target player (matching C++ logic: if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid)))
-	targetPlayer := s.playerManager.GetPlayerByID(types.PlayerID(packet.PlayerID))
-	if targetPlayer == nil {
-		s.logger.Warn().
-			Int32("targetPlayerID", packet.PlayerID).
-			Msg("Target player not found for entity blip update")
-		return nil // Target player doesn't exist
-	}
-
-	// Get the target client ID
-	targetClientID := s.playerManager.GetClientIDByPlayer(targetPlayer)
-	if targetClientID == "" {
-		s.logger.Warn().
-			Int32("targetPlayerID", packet.PlayerID).
-			Msg("Target client not found for entity blip update")
-		return nil
-	}
-
-	// Get the target client
-	targetClient := s.networkServer.GetClient(targetClientID)
+	// Find the target player and get their client (matching C++ logic: if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid)))
+	targetClient := s.getClientByPlayerID(types.PlayerID(packet.PlayerID))
 	if targetClient == nil {
 		s.logger.Warn().
-			Str("targetClientID", targetClientID).
-			Msg("Target client not found for entity blip update")
-		return nil
+			Int32("targetPlayerID", packet.PlayerID).
+			Msg("Target player or client not found for entity blip update")
+		return nil // Target player doesn't exist or client not found
 	}
 
 	// Send packet to target client (reliable packet, matching C++ logic)
@@ -598,31 +580,13 @@ func (s *Server) handleRemoveEntityBlip(client *network.Client, data []byte) err
 		Int32("entityID", packet.EntityID).
 		Msg("Host removing entity blip")
 
-	// Find the target player (matching C++ logic: if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid)))
-	targetPlayer := s.playerManager.GetPlayerByID(types.PlayerID(packet.PlayerID))
-	if targetPlayer == nil {
-		s.logger.Warn().
-			Int32("targetPlayerID", packet.PlayerID).
-			Msg("Target player not found for entity blip removal")
-		return nil // Target player doesn't exist
-	}
-
-	// Get the target client ID
-	targetClientID := s.playerManager.GetClientIDByPlayer(targetPlayer)
-	if targetClientID == "" {
-		s.logger.Warn().
-			Int32("targetPlayerID", packet.PlayerID).
-			Msg("Target client not found for entity blip removal")
-		return nil
-	}
-
-	// Get the target client
-	targetClient := s.networkServer.GetClient(targetClientID)
+	// Find the target player and get their client (matching C++ logic: if (auto targetPlayer = CPlayerManager::GetPlayer(packet->playerid)))
+	targetClient := s.getClientByPlayerID(types.PlayerID(packet.PlayerID))
 	if targetClient == nil {
 		s.logger.Warn().
-			Str("targetClientID", targetClientID).
-			Msg("Target client not found for entity blip removal")
-		return nil
+			Int32("targetPlayerID", packet.PlayerID).
+			Msg("Target player or client not found for entity blip removal")
+		return nil // Target player doesn't exist or client not found
 	}
 
 	// Send packet to target client (reliable packet, matching C++ logic)

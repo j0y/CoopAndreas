@@ -157,3 +157,13 @@ func (s *Server) getClientByPlayer(player *entities.Player) *network.Client {
 	// Get the client from the network server
 	return s.networkServer.GetClient(clientID)
 }
+
+// getClientByPlayerID finds the network client associated with a specific player ID
+// This combines GetPlayerByID + getClientByPlayer into a single call with proper error handling
+func (s *Server) getClientByPlayerID(playerID types.PlayerID) *network.Client {
+	player := s.playerManager.GetPlayerByID(playerID)
+	if player == nil {
+		return nil
+	}
+	return s.getClientByPlayer(player)
+}
