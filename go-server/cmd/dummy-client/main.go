@@ -16,15 +16,17 @@ import (
 )
 
 type DummyClient struct {
-	host       enet.Host
-	peer       enet.Peer
-	playerName string
-	position   types.Vector3
-	angle      float32
-	moveSpeed  float32
-	running    bool
-	connected  bool
-	playerID   types.PlayerID
+	host         enet.Host
+	peer         enet.Peer
+	playerName   string
+	position     types.Vector3
+	angle        float32
+	moveSpeed    float32
+	running      bool
+	connected    bool
+	playerID     types.PlayerID
+	lastUpdate   time.Time
+	movementTime float64 // Track movement time for circular motion
 }
 
 func main() {
@@ -66,15 +68,17 @@ func main() {
 	}
 
 	client := &DummyClient{
-		host:       host,
-		peer:       peer,
-		playerName: *playerName,
-		position:   types.Vector3{X: 0.0, Y: 0.0, Z: 3.0}, // Start at spawn point
-		angle:      0.0,
-		moveSpeed:  2.0, // Units per second
-		running:    true,
-		connected:  false,
-		playerID:   0, // Will be set by server
+		host:         host,
+		peer:         peer,
+		playerName:   *playerName,
+		position:     types.Vector3{X: 1000.0, Y: 1500.0, Z: 3.0}, // Start at spawn point
+		angle:        0.0,
+		moveSpeed:    2.0, // Units per second
+		running:      true,
+		connected:    false,
+		playerID:     0, // Will be set by server
+		lastUpdate:   time.Now(),
+		movementTime: 0.0,
 	}
 
 	log.Info().Msg("Connecting to server...")
@@ -225,19 +229,36 @@ func (c *DummyClient) sendPlayerName() bool {
 }
 
 func (c *DummyClient) updatePosition() {
-	// Move in a circle pattern
-	currentTime := float64(time.Now().UnixNano()) / 1e9 // Convert nanoseconds to seconds with high precision
-	radius := float32(50.0)
+	now := time.Now()
+	deltaTime := now.Sub(c.lastUpdate).Seconds()
+	c.lastUpdate = now
 
-	// Use a reasonable multiplier for visible movement (complete circle every ~60 seconds)
-	timeMultiplier := currentTime * 0.1
+	// Update movement time for smooth motion
+	c.movementTime += deltaTime
 
-	c.position.X = radius * float32(math.Cos(timeMultiplier))
-	c.position.Y = radius * float32(math.Sin(timeMultiplier))
-	c.position.Z = 3.0 + float32(math.Sin(timeMultiplier*2.0))*2.0 // Bob up and down
+	// Calculate movement based on current angle and speed
+	// Move forward at moveSpeed units per second
+	moveDistance := float32(deltaTime) * c.moveSpeed
 
-	// Update angle to face movement direction (keep it in reasonable range 0-2π)
-	c.angle = float32(math.Mod(timeMultiplier, 2*math.Pi))
+	// Calculate velocity based on current angle
+	velocityX := moveDistance * float32(math.Cos(float64(c.angle)))
+	velocityY := moveDistance * float32(math.Sin(float64(c.angle)))
+
+	// Update position based on previous position + velocity
+	c.position.X += velocityX
+	c.position.Y += velocityY
+
+	// Add some Z-axis bobbing for visual effect
+	c.position.Z = 3.0 + float32(math.Sin(c.movementTime*2.0))*0.5 // Subtle bobbing
+
+	// Gradually turn the player (complete rotation every ~30 seconds)
+	angleChange := float32(deltaTime * 0.2) // Radians per second
+	c.angle += angleChange
+
+	// Keep angle in 0-2π range
+	if c.angle > 2*math.Pi {
+		c.angle -= 2 * math.Pi
+	}
 }
 
 func (c *DummyClient) sendPositionUpdate() bool {
