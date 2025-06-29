@@ -168,12 +168,10 @@ func (pm *PlayerManager) GetPlayerByID(playerID types.PlayerID) *Player {
 
 // GetFreeID finds the first available player ID (matching C++ CPlayerManager::GetFreeID)
 func (pm *PlayerManager) GetFreeID() types.PlayerID {
-	const maxPlayers = 32
-
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
 
-	for i := 0; i < maxPlayers; i++ {
+	for i := 0; i < types.MaxPlayers; i++ {
 		playerID := types.PlayerID(i)
 		found := false
 

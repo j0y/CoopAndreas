@@ -95,3 +95,8 @@ const (
 	NETWORK_ENTITY_TYPE_DUMMY
 	NETWORK_ENTITY_TYPE_NOTINPOOLS
 )
+
+// Server configuration constants
+const (
+	MaxPlayers = 8192 // Maximum number of players/connections (matching C++ MAX_SERVER_PLAYERS)
+)

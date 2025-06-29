@@ -14,7 +14,9 @@ import (
 )
 
 const (
-	MaxPacketSize = 1024
+	MaxPacketSize        = 1024
+	MaxENetChannels      = 2   // Number of ENet channels (0 = reliable, 1 = unreliable)
+	ENetServiceTimeoutMs = 100 // ENet service timeout in milliseconds
 )
 
 // PacketFlag represents ENet packet flags
@@ -118,7 +120,7 @@ func (s *Server) Start() error {
 	addr := enet.NewListenAddress(uint16(6767))
 
 	// Create ENet host
-	host, err := enet.NewHost(addr, 32, 2, 0, 0) // 32 peers, 2 channels, no bandwidth limits
+	host, err := enet.NewHost(addr, types.MaxPlayers, MaxENetChannels, 0, 0) // MaxPlayers peers, MaxENetChannels channels, no bandwidth limits
 	if err != nil {
 		enet.Deinitialize()
 		return fmt.Errorf("failed to create ENet host: %w", err)
@@ -164,7 +166,7 @@ func (s *Server) IsRunning() bool {
 // run is the main server loop
 func (s *Server) run() {
 	for s.IsRunning() {
-		event := s.host.Service(100) // 100ms timeout
+		event := s.host.Service(ENetServiceTimeoutMs) // Use constant for timeout
 		if event == nil {
 			continue
 		}
