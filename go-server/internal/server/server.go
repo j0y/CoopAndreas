@@ -22,6 +22,8 @@ type Server struct {
 	logger         zerolog.Logger
 	// Global game state
 	currentWeatherTime *packets.GameWeatherTimePacket // Current weather/time state, nil if not set
+	lastEnExData       []byte                         // Last ENEX data from host, nil if not set
+	lastEnExOwner      *entities.Player               // Player who sent the last ENEX data
 }
 
 // New creates a new game server instance
@@ -137,6 +139,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handleRemoveCheckpoint(client, packet.Data)
 	case types.CREATE_STATIC_BLIP:
 		return s.handleCreateStaticBlip(client, packet.Data)
+	case types.ENEX_SYNC:
+		return s.handleEnExSync(client, packet.Data)
 	case types.MASS_PACKET_SEQUENCE:
 		return s.handleMassPacketSequence(client, packet.Data)
 	default:

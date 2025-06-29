@@ -48,6 +48,28 @@ func (s *Server) HandlePlayerConnect(client *network.Client) {
 	handshakePacket := packets.NewPlayerHandshakePacket(player.ID)
 	s.sendHandshakeTo(client, handshakePacket)
 
+	// Send last ENEX data to new player if available (matching C++ logic)
+	// This matches C++: CNetwork::SendPacket(event.peer, CPacketsID::ENEX_SYNC, ...)
+	if s.lastEnExData != nil && s.lastEnExOwner != nil {
+		// Check if the ENEX owner is still connected
+		if s.playerManager.GetPlayerByID(s.lastEnExOwner.ID) != nil {
+			networkPacket := &network.NetworkPacket{
+				ID:   types.ENEX_SYNC,
+				Data: s.lastEnExData,
+				Flag: 1, // Reliable for ENEX synchronization
+			}
+
+			if err := s.networkServer.SendPacket(client, networkPacket); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send ENEX data to new player")
+			} else {
+				s.logger.Debug().
+					Str("player", player.Name).
+					Str("enexOwner", s.lastEnExOwner.Name).
+					Msg("Sent last ENEX data to new player")
+			}
+		}
+	}
+
 	// Note: Weather/time synchronization is NOT sent here in C++ implementation
 	// It's only sent when a client becomes host and sends weather data to the server
 	// The C++ server doesn't proactively send weather data during connection
@@ -116,6 +138,13 @@ func (s *Server) HandlePlayerDisconnect(client *network.Client) {
 
 	// Remove player from manager
 	s.playerManager.RemovePlayer(clientID)
+
+	// Clear ENEX data if the disconnecting player was the ENEX owner
+	if s.lastEnExOwner != nil && s.lastEnExOwner.ID == disconnectedPlayerID {
+		s.lastEnExData = nil
+		s.lastEnExOwner = nil
+		s.logger.Debug().Msg("Cleared ENEX data as owner disconnected")
+	}
 
 	// Create and broadcast PLAYER_DISCONNECTED packet to all remaining clients
 	disconnectPacket := packets.NewPlayerDisconnectedPacket(disconnectedPlayerID, 0) // Normal disconnect (no specific reason code)

@@ -1057,3 +1057,116 @@ func NewCreateStaticBlipPacket(position types.Vector3, sprite int8, display, bli
 		ShortRange:   shortRange & 0x01,   // Ensure only 1 bit
 	}
 }
+
+// EnExEntryData represents a single entry/exit marker entry
+// This matches the C++ entryExit data structure
+type EnExEntryData struct {
+	X     float32 // Entrance X coordinate (entryExit->m_recEntrance.left)
+	Y     float32 // Entrance Y coordinate (entryExit->m_recEntrance.bottom)
+	Flags uint16  // Entry/exit flags (entryExit->m_nFlags)
+}
+
+// EnExSyncPacket represents entry/exit marker synchronization data
+// This matches the C++ CEntryExitMarkerSync packet format exactly
+// Variable-length packet containing all entry/exit marker states
+type EnExSyncPacket struct {
+	Disabled              bool            // ms_bDisabled flag
+	BurglaryHousesEnabled bool            // ms_bBurglaryHousesEnabled flag
+	Count                 uint16          // Number of entry/exit entries
+	Entries               []EnExEntryData // Array of entry/exit data
+}
+
+// Marshal serializes the packet to binary format with C++ struct packing
+// Matches the exact format used in CEntryExitMarkerSync::Send()
+func (p *EnExSyncPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	// Write disabled flag (bool -> uint8)
+	disabled := uint8(0)
+	if p.Disabled {
+		disabled = 1
+	}
+	if err := binary.Write(buf, binary.LittleEndian, disabled); err != nil {
+		return nil, err
+	}
+
+	// Write burglary houses enabled flag (bool -> uint8)
+	burglaryEnabled := uint8(0)
+	if p.BurglaryHousesEnabled {
+		burglaryEnabled = 1
+	}
+	if err := binary.Write(buf, binary.LittleEndian, burglaryEnabled); err != nil {
+		return nil, err
+	}
+
+	// Write count (uint16)
+	if err := binary.Write(buf, binary.LittleEndian, p.Count); err != nil {
+		return nil, err
+	}
+
+	// Write entries (each entry: float, float, uint16)
+	for _, entry := range p.Entries {
+		if err := binary.Write(buf, binary.LittleEndian, entry.X); err != nil {
+			return nil, err
+		}
+		if err := binary.Write(buf, binary.LittleEndian, entry.Y); err != nil {
+			return nil, err
+		}
+		if err := binary.Write(buf, binary.LittleEndian, entry.Flags); err != nil {
+			return nil, err
+		}
+	}
+
+	return buf.Bytes(), nil
+}
+
+// Unmarshal deserializes binary data to packet with C++ struct packing
+// Matches the exact format used in CEntryExitMarkerSync::Receive()
+func (p *EnExSyncPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+
+	// Read disabled flag (uint8 -> bool)
+	var disabled uint8
+	if err := binary.Read(buf, binary.LittleEndian, &disabled); err != nil {
+		return err
+	}
+	p.Disabled = disabled != 0
+
+	// Read burglary houses enabled flag (uint8 -> bool)
+	var burglaryEnabled uint8
+	if err := binary.Read(buf, binary.LittleEndian, &burglaryEnabled); err != nil {
+		return err
+	}
+	p.BurglaryHousesEnabled = burglaryEnabled != 0
+
+	// Read count (uint16)
+	if err := binary.Read(buf, binary.LittleEndian, &p.Count); err != nil {
+		return err
+	}
+
+	// Read entries
+	p.Entries = make([]EnExEntryData, p.Count)
+	for i := uint16(0); i < p.Count; i++ {
+		if err := binary.Read(buf, binary.LittleEndian, &p.Entries[i].X); err != nil {
+			return err
+		}
+		if err := binary.Read(buf, binary.LittleEndian, &p.Entries[i].Y); err != nil {
+			return err
+		}
+		if err := binary.Read(buf, binary.LittleEndian, &p.Entries[i].Flags); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// NewEnExSyncPacket creates a new entry/exit synchronization packet
+func NewEnExSyncPacket(disabled, burglaryEnabled bool, entries []EnExEntryData) *EnExSyncPacket {
+	return &EnExSyncPacket{
+		Disabled:              disabled,
+		BurglaryHousesEnabled: burglaryEnabled,
+		Count:                 uint16(len(entries)),
+		Entries:               entries,
+	}
+}

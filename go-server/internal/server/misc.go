@@ -988,3 +988,57 @@ func (s *Server) handleCreateStaticBlip(client *network.Client, data []byte) err
 
 	return nil
 }
+
+// handleEnExSync handles ENEX_SYNC packets
+// This matches the C++ CPlayerPackets::EnExSync::Handle() functionality
+// Only the host player can send ENEX data, and it gets broadcast to all other clients
+// Also stores the data to send to newly connected players
+func (s *Server) handleEnExSync(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Check if player is host (matching C++ logic: if (player->m_bIsHost))
+	if !player.IsHost {
+		s.logger.Warn().
+			Str("player", player.Name).
+			Str("client", client.GetClientID()).
+			Msg("Non-host player attempted to send ENEX sync")
+		return nil // Ignore non-host ENEX sync
+	}
+
+	// Parse the packet for validation and logging
+	var packet packets.EnExSyncPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal EnExSync packet: %w", err)
+	}
+
+	s.logger.Info().
+		Str("player", player.Name).
+		Bool("disabled", packet.Disabled).
+		Bool("burglaryEnabled", packet.BurglaryHousesEnabled).
+		Uint16("entryCount", packet.Count).
+		Msg("Host sending ENEX synchronization")
+
+	// Store the raw data and owner for sending to new players
+	// This matches C++ logic: ms_vLastData.assign((uint8_t*)data, (uint8_t*)data + size)
+	s.lastEnExData = make([]byte, len(data))
+	copy(s.lastEnExData, data)
+	s.lastEnExOwner = player
+
+	// Broadcast to all other clients (reliable packet, matching C++ logic)
+	// This matches C++ logic: CNetwork::SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	networkPacket := &network.NetworkPacket{
+		ID:   types.ENEX_SYNC,
+		Data: data,
+		Flag: 1, // Reliable for ENEX synchronization (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast ENEX synchronization: %w", err)
+	}
+
+	return nil
+}
