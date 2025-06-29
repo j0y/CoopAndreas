@@ -757,3 +757,50 @@ func (s *Server) handlePlayerChatMessage(client *network.Client, data []byte) er
 
 	return nil
 }
+
+// handlePlayerAimSync handles PLAYER_AIM_SYNC packets
+func (s *Server) handlePlayerAimSync(client *network.Client, data []byte) error {
+	// Get player associated with this client
+	player := s.playerManager.GetPlayer(client.GetClientID())
+	if player == nil {
+		return fmt.Errorf("no player found for client %s", client.GetClientID())
+	}
+
+	// Parse the packet
+	var packet packets.PlayerAimSyncPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PlayerAimSync packet: %w", err)
+	}
+
+	// Override the player ID with the server's authoritative player ID (matching C++ logic)
+	packet.PlayerID = player.ID
+
+	s.logger.Debug().
+		Str("player", player.Name).
+		Int32("playerID", int32(player.ID)).
+		Uint8("cameraMode", packet.CameraMode).
+		Float32("cameraFov", packet.CameraFov).
+		Float32("moveHeading", packet.MoveHeading).
+		Float32("aimY", packet.AimY).
+		Float32("aimZ", packet.AimZ).
+		Msg("Player aim sync")
+
+	// Broadcast to all other clients (unreliable packet)
+	// This matches C++ logic: SendPacketToAll with (ENetPacketFlag)0 (unreliable)
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal player aim sync packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PLAYER_AIM_SYNC,
+		Data: packetData,
+		Flag: 0, // Unreliable for frequent aim updates (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast player aim sync: %w", err)
+	}
+
+	return nil
+}

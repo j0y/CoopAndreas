@@ -338,6 +338,33 @@ func (p *PlayerChatMessagePacket) GetMessage() string {
 	return string(runes)
 }
 
+// PlayerAimSyncPacket represents a packet for synchronizing player aiming data
+// This matches the C++ CPackets::PlayerAimSync structure exactly
+type PlayerAimSyncPacket struct {
+	PlayerID    types.PlayerID // Player ID (matches C++ int playerid)
+	CameraMode  uint8          // Camera mode (matches C++ unsigned char cameraMode)
+	CameraFov   float32        // Camera field of view (matches C++ float cameraFov)
+	Front       types.Vector3  // Camera front vector (matches C++ CVector front)
+	Source      types.Vector3  // Camera source vector (matches C++ CVector source)
+	Up          types.Vector3  // Camera up vector (matches C++ CVector up)
+	MoveHeading float32        // Movement heading (matches C++ float moveHeading)
+	AimY        float32        // Aim Y angle (matches C++ float aimY)
+	AimZ        float32        // Aim Z angle (matches C++ float aimZ)
+}
+
+// Marshal serializes the packet to binary format
+func (p *PlayerAimSyncPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PlayerAimSyncPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
 // NewPlayerConnectedPacket creates a new player connected notification
 func NewPlayerConnectedPacket(playerID types.PlayerID, isAlreadyConnected bool) *PlayerConnectedPacket {
 	packet := &PlayerConnectedPacket{
@@ -457,4 +484,20 @@ func NewPlayerChatMessagePacket(playerID types.PlayerID, message string) *Player
 	}
 	packet.SetMessage(message)
 	return packet
+}
+
+// NewPlayerAimSyncPacket creates a new player aim sync packet
+func NewPlayerAimSyncPacket(playerID types.PlayerID, cameraMode uint8, cameraFov float32,
+	front, source, up types.Vector3, moveHeading, aimY, aimZ float32) *PlayerAimSyncPacket {
+	return &PlayerAimSyncPacket{
+		PlayerID:    playerID,
+		CameraMode:  cameraMode,
+		CameraFov:   cameraFov,
+		Front:       front,
+		Source:      source,
+		Up:          up,
+		MoveHeading: moveHeading,
+		AimY:        aimY,
+		AimZ:        aimZ,
+	}
 }

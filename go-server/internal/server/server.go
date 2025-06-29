@@ -73,6 +73,8 @@ func (s *Server) HandlePacket(client *network.Client, packet *network.NetworkPac
 		return s.handlePedDriverUpdate(client, packet.Data)
 	case types.PLAYER_KEY_SYNC:
 		return s.handlePlayerKeySync(client, packet.Data)
+	case types.PLAYER_AIM_SYNC:
+		return s.handlePlayerAimSync(client, packet.Data)
 	case types.RESPAWN_PLAYER:
 		return s.handleRespawnPlayer(client, packet.Data)
 	case types.PLAYER_SET_HOST:
