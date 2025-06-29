@@ -98,5 +98,5 @@ const (
 
 // Server configuration constants
 const (
-	MaxPlayers = 8192 // Maximum number of players/connections (matching C++ MAX_SERVER_PLAYERS)
+	MaxPlayers = 4095 // Maximum number of players/connections (matching C++ MAX_SERVER_PLAYERS)
 )
