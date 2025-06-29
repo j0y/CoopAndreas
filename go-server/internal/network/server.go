@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/codecat/go-enet"
 	"github.com/rs/zerolog"
@@ -16,7 +15,6 @@ import (
 
 const (
 	MaxPacketSize = 1024
-	ServerTimeout = 30 * time.Second
 )
 
 // PacketFlag represents ENet packet flags
@@ -29,13 +27,9 @@ const (
 
 // Client represents a connected client
 type Client struct {
-	ID         uint32 // Unique client ID
-	Addr       *net.UDPAddr
-	LastSeen   time.Time
-	Reliable   chan []byte // Channel for reliable packets
-	Unreliable chan []byte // Channel for unreliable packets
-	Connected  bool
-	mutex      sync.RWMutex
+	ID    uint32 // Unique client ID
+	Addr  *net.UDPAddr
+	mutex sync.RWMutex
 	// ENet support (required for ENet clients)
 	ENetPeer interface{} // Holds enet.Peer for ENet clients
 }
@@ -43,27 +37,9 @@ type Client struct {
 // NewClient creates a new client instance
 func NewClient(id uint32, addr *net.UDPAddr) *Client {
 	return &Client{
-		ID:         id,
-		Addr:       addr,
-		LastSeen:   time.Now(),
-		Reliable:   make(chan []byte, 100),
-		Unreliable: make(chan []byte, 100),
-		Connected:  true,
+		ID:   id,
+		Addr: addr,
 	}
-}
-
-// UpdateLastSeen updates the client's last seen time
-func (c *Client) UpdateLastSeen() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	c.LastSeen = time.Now()
-}
-
-// IsTimedOut returns true if the client has timed out
-func (c *Client) IsTimedOut() bool {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	return time.Since(c.LastSeen) > ServerTimeout
 }
 
 // GetClientID returns a unique string identifier for this client
@@ -325,8 +301,6 @@ func (s *Server) handleReceive(event enet.Event) {
 		s.logger.Warn().Uint32("clientID", clientID).Msg("Received packet from unknown client")
 		return
 	}
-
-	client.UpdateLastSeen()
 
 	packet := event.GetPacket()
 	data := packet.GetData()
