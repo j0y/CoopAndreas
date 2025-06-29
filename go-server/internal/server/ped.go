@@ -269,6 +269,98 @@ func (s *Server) handlePedDriverUpdate(client *network.Client, data []byte) erro
 	return nil
 }
 
+// handlePedAddTask handles PED_ADD_TASK packets
+func (s *Server) handlePedAddTask(client *network.Client, data []byte) error {
+	// Parse the packet (variable length)
+	var packet packets.PedAddTaskPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PedAddTask packet: %w", err)
+	}
+
+	// Extract basic task information for logging
+	pedID, taskID, taskSlot, bPrimary, err := packet.GetBasicInfo()
+	if err != nil {
+		return fmt.Errorf("failed to extract task info: %w", err)
+	}
+
+	// Check if the ped exists
+	ped := s.pedManager.GetPed(types.PedID(pedID))
+	if ped == nil {
+		s.logger.Warn().
+			Int32("pedID", pedID).
+			Str("client", client.GetClientID()).
+			Msg("Add task packet for non-existent ped")
+		return nil // Ignore packets for non-existent peds
+	}
+
+	s.logger.Debug().
+		Int32("pedID", pedID).
+		Int32("taskID", taskID).
+		Uint8("taskSlot", taskSlot).
+		Bool("primary", bPrimary).
+		Str("client", client.GetClientID()).
+		Msg("Ped add task")
+
+	// Broadcast to all other clients (reliable packet)
+	// This matches C++ logic: SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	// The server forwards the raw task data without processing it (matching C++ "TODO: protect" comment)
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PED_ADD_TASK,
+		Data: packet.Data, // Forward raw serialized task data
+		Flag: 1,           // Reliable for task updates (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast ped add task: %w", err)
+	}
+
+	return nil
+}
+
+// handlePedRemoveTask handles PED_REMOVE_TASK packets
+func (s *Server) handlePedRemoveTask(client *network.Client, data []byte) error {
+	// Parse the packet
+	var packet packets.PedRemoveTaskPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal PedRemoveTask packet: %w", err)
+	}
+
+	// Check if the ped exists
+	ped := s.pedManager.GetPed(types.PedID(packet.PedID))
+	if ped == nil {
+		s.logger.Warn().
+			Int32("pedID", packet.PedID).
+			Str("client", client.GetClientID()).
+			Msg("Remove task packet for non-existent ped")
+		return nil // Ignore packets for non-existent peds
+	}
+
+	s.logger.Debug().
+		Int32("pedID", packet.PedID).
+		Int32("taskID", packet.TaskID).
+		Str("client", client.GetClientID()).
+		Msg("Ped remove task")
+
+	// Broadcast to all other clients (reliable packet)
+	// This matches C++ logic: SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal ped remove task packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.PED_REMOVE_TASK,
+		Data: packetData,
+		Flag: 1, // Reliable for task updates (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast ped remove task: %w", err)
+	}
+
+	return nil
+}
+
 // sendExistingPedsTo sends information about all existing peds to a new player
 func (s *Server) sendExistingPedsTo(client *network.Client) {
 	allPeds := s.pedManager.GetAllPeds()

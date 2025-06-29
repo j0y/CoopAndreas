@@ -447,3 +447,79 @@ func NewPedDriverUpdatePacket(pedID types.PedID, vehicleID int32, pos, rot, roll
 		DestinationCoords: destinationCoords,
 	}
 }
+
+// PedAddTaskPacket represents a variable-length packet for adding tasks to peds
+// This packet contains serialized task data and is forwarded by the server without processing
+// The format starts with: pedId (4 bytes), taskId (4 bytes), taskSlot (1 byte), bPrimary (1 byte)
+// followed by task-specific serialized data of variable length
+type PedAddTaskPacket struct {
+	Data []byte // Raw serialized task data (variable length)
+}
+
+// Marshal serializes the packet to binary format
+func (p *PedAddTaskPacket) Marshal() ([]byte, error) {
+	return p.Data, nil // Return raw data as-is
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PedAddTaskPacket) Unmarshal(data []byte) error {
+	p.Data = make([]byte, len(data))
+	copy(p.Data, data)
+	return nil
+}
+
+// GetBasicInfo extracts the basic task information from the serialized data
+// Returns: pedId, taskId, taskSlot, bPrimary, error
+func (p *PedAddTaskPacket) GetBasicInfo() (int32, int32, uint8, bool, error) {
+	if len(p.Data) < 10 { // Minimum size: 4+4+1+1 = 10 bytes
+		return 0, 0, 0, false, fmt.Errorf("packet too short: %d bytes", len(p.Data))
+	}
+
+	buf := bytes.NewReader(p.Data)
+	var pedId, taskId int32
+	var taskSlot uint8
+	var bPrimary uint8
+
+	if err := binary.Read(buf, binary.LittleEndian, &pedId); err != nil {
+		return 0, 0, 0, false, err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &taskId); err != nil {
+		return 0, 0, 0, false, err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &taskSlot); err != nil {
+		return 0, 0, 0, false, err
+	}
+	if err := binary.Read(buf, binary.LittleEndian, &bPrimary); err != nil {
+		return 0, 0, 0, false, err
+	}
+
+	return pedId, taskId, taskSlot, bPrimary != 0, nil
+}
+
+// PedRemoveTaskPacket represents a packet for removing tasks from peds
+// This matches the C++ CPackets::PedRemoveTask structure exactly
+type PedRemoveTaskPacket struct {
+	PedID  int32 // Ped ID (matches C++ int pedid)
+	TaskID int32 // Task ID to remove (matches C++ eTaskType taskid)
+}
+
+// Marshal serializes the packet to binary format
+func (p *PedRemoveTaskPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *PedRemoveTaskPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
+// NewPedRemoveTaskPacket creates a new ped remove task packet
+func NewPedRemoveTaskPacket(pedID int32, taskID int32) *PedRemoveTaskPacket {
+	return &PedRemoveTaskPacket{
+		PedID:  pedID,
+		TaskID: taskID,
+	}
+}
