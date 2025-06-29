@@ -22,7 +22,7 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 	playerName := packet.GetNameString()
 
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		s.logger.Warn().
 			Uint32("clientID", client.ID).
@@ -62,7 +62,7 @@ func (s *Server) handlePlayerGetName(client *network.Client, data []byte) error 
 // handlePlayerOnFoot handles PLAYER_ONFOOT packets
 func (s *Server) handlePlayerOnFoot(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -133,7 +133,7 @@ func (s *Server) handlePlayerKeySync(client *network.Client, data []byte) error 
 		Msg("Received PLAYER_KEY_SYNC packet")
 
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -451,7 +451,7 @@ func (s *Server) assignHostToFirstPlayer() error {
 // This matches the C++ CPlayerPackets::RespawnPlayer::Handle() functionality
 func (s *Server) handleRespawnPlayer(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -494,7 +494,7 @@ func (s *Server) handleRespawnPlayer(client *network.Client, data []byte) error 
 // This matches the C++ CPlayerPackets::PlayerStats::Handle() functionality
 func (s *Server) handlePlayerStats(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -543,7 +543,7 @@ func (s *Server) handlePlayerStats(client *network.Client, data []byte) error {
 // This matches the C++ CPlayerPackets::RebuildPlayer::Handle() functionality
 func (s *Server) handleRebuildPlayer(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -595,7 +595,7 @@ func (s *Server) handleRebuildPlayer(client *network.Client, data []byte) error 
 // This matches the C++ CPlayerPackets::PlayerPlaceWaypoint::Handle() functionality
 func (s *Server) handlePlayerPlaceWaypoint(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -662,7 +662,7 @@ func (s *Server) handlePlayerPlaceWaypoint(client *network.Client, data []byte) 
 // This matches the C++ CPlayerPackets::PlayerBulletShot::Handle() functionality
 func (s *Server) handlePlayerBulletShot(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -712,7 +712,7 @@ func (s *Server) handlePlayerBulletShot(client *network.Client, data []byte) err
 // handlePlayerChatMessage handles PLAYER_CHAT_MESSAGE packets
 func (s *Server) handlePlayerChatMessage(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -761,7 +761,7 @@ func (s *Server) handlePlayerChatMessage(client *network.Client, data []byte) er
 // handlePlayerAimSync handles PLAYER_AIM_SYNC packets
 func (s *Server) handlePlayerAimSync(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}

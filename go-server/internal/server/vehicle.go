@@ -12,7 +12,7 @@ import (
 // handleVehicleSpawn handles VEHICLE_SPAWN packets
 func (s *Server) handleVehicleSpawn(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -204,7 +204,7 @@ func (s *Server) sendExistingVehiclesTo(client *network.Client) {
 // handleVehicleRemove handles VEHICLE_REMOVE packets
 func (s *Server) handleVehicleRemove(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -273,7 +273,7 @@ func (s *Server) handleVehicleRemove(client *network.Client, data []byte) error 
 // handleVehicleIdleUpdate handles VEHICLE_IDLE_UPDATE packets
 func (s *Server) handleVehicleIdleUpdate(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -350,7 +350,7 @@ func (s *Server) handleVehicleIdleUpdate(client *network.Client, data []byte) er
 // handleVehicleDriverUpdate handles VEHICLE_DRIVER_UPDATE packets
 func (s *Server) handleVehicleDriverUpdate(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -449,7 +449,7 @@ func (s *Server) handleVehicleDriverUpdate(client *network.Client, data []byte) 
 // handleVehicleEnter handles VEHICLE_ENTER packets
 func (s *Server) handleVehicleEnter(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -565,7 +565,7 @@ func (s *Server) handleVehicleEnter(client *network.Client, data []byte) error {
 // handleVehicleExit handles VEHICLE_EXIT packets
 func (s *Server) handleVehicleExit(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -666,7 +666,7 @@ func (s *Server) handleVehicleExit(client *network.Client, data []byte) error {
 // This matches the C++ CVehiclePackets::VehiclePassengerUpdate::Handle() functionality
 func (s *Server) handleVehiclePassengerUpdate(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}

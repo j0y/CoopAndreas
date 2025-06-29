@@ -39,7 +39,7 @@ type Ped struct {
 
 // PlayerManager manages all connected players
 type PlayerManager struct {
-	players   map[string]*Player // key: unique client ID (not peer address)
+	players   map[string]*Player // key: PeerAddr (IP:Port like C++ implementation)
 	joinOrder []*Player          // tracks players in join order (like C++ vector)
 	mutex     sync.RWMutex
 }
@@ -52,28 +52,28 @@ func NewPlayerManager() *PlayerManager {
 	}
 }
 
-// AddPlayer adds a new player
-func (pm *PlayerManager) AddPlayer(clientID string, player *Player) {
+// AddPlayer adds a new player using PeerAddr as key
+func (pm *PlayerManager) AddPlayer(player *Player) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
-	pm.players[clientID] = player
+	pm.players[player.PeerAddr] = player
 	pm.joinOrder = append(pm.joinOrder, player) // Track join order like C++ vector
 }
 
-// GetPlayer retrieves a player by client ID
-func (pm *PlayerManager) GetPlayer(clientID string) *Player {
+// GetPlayer retrieves a player by PeerAddr
+func (pm *PlayerManager) GetPlayer(peerAddr string) *Player {
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
-	return pm.players[clientID]
+	return pm.players[peerAddr]
 }
 
-// RemovePlayer removes a player
-func (pm *PlayerManager) RemovePlayer(clientID string) {
+// RemovePlayer removes a player by PeerAddr
+func (pm *PlayerManager) RemovePlayer(peerAddr string) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
-	player := pm.players[clientID]
-	delete(pm.players, clientID)
+	player := pm.players[peerAddr]
+	delete(pm.players, peerAddr)
 
 	// Also remove from join order slice
 	if player != nil {
@@ -164,17 +164,4 @@ func (pm *PlayerManager) GetPlayerByID(playerID types.PlayerID) *Player {
 		}
 	}
 	return nil
-}
-
-// GetClientIDByPlayer returns the client ID associated with a player
-func (pm *PlayerManager) GetClientIDByPlayer(player *Player) string {
-	pm.mutex.RLock()
-	defer pm.mutex.RUnlock()
-
-	for clientID, managedPlayer := range pm.players {
-		if managedPlayer.ID == player.ID {
-			return clientID
-		}
-	}
-	return ""
 }

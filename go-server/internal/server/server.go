@@ -164,14 +164,8 @@ func (s *Server) getClientByPlayer(player *entities.Player) *network.Client {
 		return nil
 	}
 
-	// Get the client ID associated with this player
-	clientID := s.playerManager.GetClientIDByPlayer(player)
-	if clientID == "" {
-		return nil
-	}
-
-	// Get the client from the network server
-	return s.networkServer.GetClient(clientID)
+	// Direct lookup using PeerAddr (much simpler than before)
+	return s.networkServer.GetClient(player.PeerAddr)
 }
 
 // getClientByPlayerID finds the network client associated with a specific player ID
@@ -181,5 +175,5 @@ func (s *Server) getClientByPlayerID(playerID types.PlayerID) *network.Client {
 	if player == nil {
 		return nil
 	}
-	return s.getClientByPlayer(player)
+	return s.networkServer.GetClient(player.PeerAddr)
 }

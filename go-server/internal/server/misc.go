@@ -41,7 +41,7 @@ func (s *Server) handleMassPacketSequence(client *network.Client, data []byte) e
 // Only the host player can send weather/time updates to synchronize all clients
 func (s *Server) handleGameWeatherTime(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -185,7 +185,7 @@ func (s *Server) broadcastCurrentWeatherTime() error {
 // Only the host player can send opcode synchronization packets
 func (s *Server) handleOpCodeSync(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -236,7 +236,7 @@ func (s *Server) handleOpCodeSync(client *network.Client, data []byte) error {
 // Only the host player can send mission audio playback packets
 func (s *Server) handlePlayMissionAudio(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -296,7 +296,7 @@ func (s *Server) handlePlayMissionAudio(client *network.Client, data []byte) err
 // Simply rebroadcasts the explosion to all other clients
 func (s *Server) handleAddExplosion(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -344,7 +344,7 @@ func (s *Server) handleAddExplosion(client *network.Client, data []byte) error {
 // Only the host player can start cutscenes, and it gets broadcast to all other clients
 func (s *Server) handleStartCutscene(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -395,7 +395,7 @@ func (s *Server) handleStartCutscene(client *network.Client, data []byte) error 
 // Any player can request to skip a cutscene, and it gets broadcast to all other clients
 func (s *Server) handleSkipCutscene(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -440,7 +440,7 @@ func (s *Server) handleSkipCutscene(client *network.Client, data []byte) error {
 // Only the host player can sync mission flags, and it gets broadcast to all other clients
 func (s *Server) handleOnMissionFlagSync(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -490,7 +490,7 @@ func (s *Server) handleOnMissionFlagSync(client *network.Client, data []byte) er
 // Only the host player can update entity blips, and it gets sent to the specific target player
 func (s *Server) handleUpdateEntityBlip(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -553,7 +553,7 @@ func (s *Server) handleUpdateEntityBlip(client *network.Client, data []byte) err
 // Only the host player can remove entity blips, and it gets sent to the specific target player
 func (s *Server) handleRemoveEntityBlip(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -614,7 +614,7 @@ func (s *Server) handleRemoveEntityBlip(client *network.Client, data []byte) err
 // Only the host player can add GXT messages, and it gets sent to the specific target player
 func (s *Server) handleAddMessageGXT(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -677,7 +677,7 @@ func (s *Server) handleAddMessageGXT(client *network.Client, data []byte) error 
 // Only the host player can remove GXT messages, and it gets sent to the specific target player
 func (s *Server) handleRemoveMessageGXT(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -737,7 +737,7 @@ func (s *Server) handleRemoveMessageGXT(client *network.Client, data []byte) err
 // Only the host player can clear entity blips, and it gets sent to the specific target player
 func (s *Server) handleClearEntityBlips(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -796,7 +796,7 @@ func (s *Server) handleClearEntityBlips(client *network.Client, data []byte) err
 // Only the host player can update checkpoints, and it gets sent to the specific target player
 func (s *Server) handleUpdateCheckpoint(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -861,7 +861,7 @@ func (s *Server) handleUpdateCheckpoint(client *network.Client, data []byte) err
 // Only the host player can remove checkpoints, and it gets sent to the specific target player
 func (s *Server) handleRemoveCheckpoint(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -928,7 +928,7 @@ func isAllowedRadarSprite(sprite int8) bool {
 // Only the host player can create static blips, and it gets broadcast to all other clients
 func (s *Server) handleCreateStaticBlip(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -995,7 +995,7 @@ func (s *Server) handleCreateStaticBlip(client *network.Client, data []byte) err
 // Also stores the data to send to newly connected players
 func (s *Server) handleEnExSync(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}

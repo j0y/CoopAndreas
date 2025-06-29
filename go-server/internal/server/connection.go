@@ -18,16 +18,14 @@ func (s *Server) HandlePlayerConnect(client *network.Client) {
 	player := &entities.Player{
 		ID:       playerID,
 		Name:     fmt.Sprintf("Player_%d", int(playerID)),
-		PeerAddr: client.Addr.String(), // Keep for logging/debugging purposes
+		PeerAddr: client.Addr.String(),
 		IsHost:   false,
 	}
 
-	clientID := client.GetClientID()
-	s.playerManager.AddPlayer(clientID, player)
+	s.playerManager.AddPlayer(player)
 	s.logger.Info().
 		Str("player", player.Name).
 		Str("address", client.Addr.String()).
-		Str("clientID", clientID).
 		Int32("playerID", int32(playerID)).
 		Msg("Player connected")
 
@@ -90,8 +88,8 @@ func (s *Server) HandlePlayerConnect(client *network.Client) {
 // 3. Removes the player from the player manager
 // 4. Broadcasts PLAYER_DISCONNECTED packet to all remaining clients (matching C++ behavior)
 func (s *Server) HandlePlayerDisconnect(client *network.Client) {
-	clientID := client.GetClientID()
-	player := s.playerManager.GetPlayer(clientID)
+	peerAddr := client.Addr.String()
+	player := s.playerManager.GetPlayer(peerAddr)
 	if player == nil {
 		return
 	}
@@ -137,7 +135,7 @@ func (s *Server) HandlePlayerDisconnect(client *network.Client) {
 	}
 
 	// Remove player from manager
-	s.playerManager.RemovePlayer(clientID)
+	s.playerManager.RemovePlayer(peerAddr)
 
 	// Clear ENEX data if the disconnecting player was the ENEX owner
 	if s.lastEnExOwner != nil && s.lastEnExOwner.ID == disconnectedPlayerID {

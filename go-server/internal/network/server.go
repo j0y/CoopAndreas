@@ -29,7 +29,7 @@ const (
 
 // Client represents a connected client
 type Client struct {
-	ID         uint32 // Unique client ID (more reliable than peer address)
+	ID         uint32 // Unique client ID
 	Addr       *net.UDPAddr
 	LastSeen   time.Time
 	Reliable   chan []byte // Channel for reliable packets
@@ -68,7 +68,7 @@ func (c *Client) IsTimedOut() bool {
 
 // GetClientID returns a unique string identifier for this client
 func (c *Client) GetClientID() string {
-	return fmt.Sprintf("client_%d", c.ID)
+	return fmt.Sprintf("%d", c.ID)
 }
 
 // NetworkPacket represents a network packet

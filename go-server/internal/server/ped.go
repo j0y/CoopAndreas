@@ -12,7 +12,7 @@ import (
 // handlePedSpawn handles PED_SPAWN packets
 func (s *Server) handlePedSpawn(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -95,7 +95,7 @@ func (s *Server) handlePedSpawn(client *network.Client, data []byte) error {
 // handlePedRemove handles PED_REMOVE packets
 func (s *Server) handlePedRemove(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -151,7 +151,7 @@ func (s *Server) handlePedRemove(client *network.Client, data []byte) error {
 // handlePedOnFoot handles PED_ONFOOT packets
 func (s *Server) handlePedOnFoot(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -205,7 +205,7 @@ func (s *Server) handlePedOnFoot(client *network.Client, data []byte) error {
 // handlePedDriverUpdate handles PED_DRIVER_UPDATE packets
 func (s *Server) handlePedDriverUpdate(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -364,7 +364,7 @@ func (s *Server) handlePedRemoveTask(client *network.Client, data []byte) error 
 // handlePedShotSync handles PED_SHOT_SYNC packets
 func (s *Server) handlePedShotSync(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
@@ -429,7 +429,7 @@ func (s *Server) handlePedShotSync(client *network.Client, data []byte) error {
 // handlePedPassengerUpdate handles PED_PASSENGER_UPDATE packets
 func (s *Server) handlePedPassengerUpdate(client *network.Client, data []byte) error {
 	// Get player associated with this client
-	player := s.playerManager.GetPlayer(client.GetClientID())
+	player := s.playerManager.GetPlayer(client.Addr.String())
 	if player == nil {
 		return fmt.Errorf("no player found for client %s", client.GetClientID())
 	}
