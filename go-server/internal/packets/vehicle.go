@@ -293,6 +293,26 @@ func (p *VehicleDamagePacket) Unmarshal(data []byte) error {
 	return binary.Read(buf, binary.LittleEndian, p)
 }
 
+// VehicleComponentAddPacket represents adding a component to a vehicle
+// This matches the C++ CPackets::VehicleComponentAdd structure exactly
+type VehicleComponentAddPacket struct {
+	VehicleID   int32 // Vehicle ID (matches C++ int vehicleid)
+	ComponentID int32 // Component ID to add (matches C++ int componentid)
+}
+
+// Marshal serializes the packet to binary format
+func (p *VehicleComponentAddPacket) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, p)
+	return buf.Bytes(), err
+}
+
+// Unmarshal deserializes binary data to packet
+func (p *VehicleComponentAddPacket) Unmarshal(data []byte) error {
+	buf := bytes.NewReader(data)
+	return binary.Read(buf, binary.LittleEndian, p)
+}
+
 // NewVehicleSpawnPacket creates a new vehicle spawn packet
 func NewVehicleSpawnPacket(vehicleID int32, tempID uint8, modelID uint16, pos types.Vector3, rot float32, color1, color2, createdBy uint8) *VehicleSpawnPacket {
 	return &VehicleSpawnPacket{
@@ -402,5 +422,13 @@ func NewVehicleDamagePacket(vehicleID int32, damageManager [23]byte) *VehicleDam
 	return &VehicleDamagePacket{
 		VehicleID:     vehicleID,
 		DamageManager: damageManager,
+	}
+}
+
+// NewVehicleComponentAddPacket creates a new vehicle component add packet
+func NewVehicleComponentAddPacket(vehicleID int32, componentID int32) *VehicleComponentAddPacket {
+	return &VehicleComponentAddPacket{
+		VehicleID:   vehicleID,
+		ComponentID: componentID,
 	}
 }

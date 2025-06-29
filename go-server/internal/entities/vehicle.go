@@ -30,6 +30,7 @@ type Vehicle struct {
 	Syncer             *Player         // Player responsible for syncing this vehicle
 	CreatedBy          uint8           // Who created this vehicle
 	DamageManager      [23]byte        // Damage manager data (23 bytes like C++ server)
+	Components         []int32         // Vehicle components (mods/tuning parts) - matches C++ m_pComponents
 	Active             bool            // Whether the vehicle is active
 }
 
@@ -171,14 +172,15 @@ func NewVehicle(id types.VehicleID, modelID uint16, pos types.Vector3, rot float
 		TurnSpeed:          types.Vector3{X: 0, Y: 0, Z: 0},   // No initial turn speed
 		PrimaryColor:       0,
 		SecondaryColor:     0,
-		Health:             1000.0, // Full health
-		Paintjob:           -1,     // No paintjob
-		PlaneGearState:     0.0,    // Gear retracted for planes
-		Locked:             0,      // Unlocked
-		BikeLean:           0.0,    // No lean for bikes
-		MiscComponentAngle: 0,      // Default component angle
-		Driver:             nil,    // No driver initially
-		Active:             false,  // Will be set to true when added to manager
+		Health:             1000.0,           // Full health
+		Paintjob:           -1,               // No paintjob
+		PlaneGearState:     0.0,              // Gear retracted for planes
+		Locked:             0,                // Unlocked
+		BikeLean:           0.0,              // No lean for bikes
+		MiscComponentAngle: 0,                // Default component angle
+		Driver:             nil,              // No driver initially
+		Components:         make([]int32, 0), // Empty components slice
+		Active:             false,            // Will be set to true when added to manager
 	}
 }
 
@@ -234,4 +236,43 @@ func (v *Vehicle) RemovePlayerFromVehicle(player *Player) {
 			v.RemoveOccupant(i)
 		}
 	}
+}
+
+// AddComponent adds a component to the vehicle
+func (v *Vehicle) AddComponent(componentID int32) {
+	// Check if component is already added (matching C++ logic that uses vector.push_back)
+	for _, existing := range v.Components {
+		if existing == componentID {
+			return // Component already exists
+		}
+	}
+	v.Components = append(v.Components, componentID)
+}
+
+// RemoveComponent removes a component from the vehicle
+func (v *Vehicle) RemoveComponent(componentID int32) {
+	for i, component := range v.Components {
+		if component == componentID {
+			// Remove component by slicing
+			v.Components = append(v.Components[:i], v.Components[i+1:]...)
+			return
+		}
+	}
+}
+
+// HasComponent checks if the vehicle has a specific component
+func (v *Vehicle) HasComponent(componentID int32) bool {
+	for _, component := range v.Components {
+		if component == componentID {
+			return true
+		}
+	}
+	return false
+}
+
+// GetComponents returns a copy of all components
+func (v *Vehicle) GetComponents() []int32 {
+	components := make([]int32, len(v.Components))
+	copy(components, v.Components)
+	return components
 }

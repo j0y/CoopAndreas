@@ -164,6 +164,36 @@ func (s *Server) sendExistingVehiclesTo(client *network.Client) {
 				Msg("Sent vehicle damage data to new player")
 		}
 
+		// Send all vehicle components to new player (matching C++ logic)
+		for _, componentID := range vehicle.Components {
+			componentPacket := packets.VehicleComponentAddPacket{
+				VehicleID:   int32(vehicle.ID),
+				ComponentID: componentID,
+			}
+
+			componentData, err := componentPacket.Marshal()
+			if err != nil {
+				s.logger.Error().Err(err).Msg("Failed to marshal vehicle component packet")
+				continue
+			}
+
+			componentNetworkPacket := &network.NetworkPacket{
+				ID:   types.VEHICLE_COMPONENT_ADD,
+				Data: componentData,
+				Flag: network.PacketFlagReliable,
+			}
+
+			if err := s.networkServer.SendPacket(client, componentNetworkPacket); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send vehicle component packet")
+			}
+
+			s.logger.Debug().
+				Int32("vehicleID", int32(vehicle.ID)).
+				Int32("componentID", componentID).
+				Uint32("clientID", client.ID).
+				Msg("Sent vehicle component to new player")
+		}
+
 		s.logger.Debug().
 			Int32("vehicleID", int32(vehicle.ID)).
 			Uint32("clientID", client.ID).
@@ -698,6 +728,53 @@ func (s *Server) handleVehicleDamage(client *network.Client, data []byte) error 
 
 	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
 		return fmt.Errorf("failed to broadcast vehicle damage: %w", err)
+	}
+
+	return nil
+}
+
+// handleVehicleComponentAdd handles VEHICLE_COMPONENT_ADD packets
+func (s *Server) handleVehicleComponentAdd(client *network.Client, data []byte) error {
+	// Parse the packet
+	var packet packets.VehicleComponentAddPacket
+	if err := packet.Unmarshal(data); err != nil {
+		return fmt.Errorf("failed to unmarshal VehicleComponentAdd packet: %w", err)
+	}
+
+	// Get the vehicle
+	vehicle := s.vehicleManager.GetVehicle(types.VehicleID(packet.VehicleID))
+	if vehicle == nil {
+		s.logger.Warn().
+			Int32("vehicleID", packet.VehicleID).
+			Str("client", client.GetClientID()).
+			Msg("Vehicle component add packet for non-existent vehicle")
+		return nil // Ignore packets for non-existent vehicles
+	}
+
+	// Add the component to the vehicle (matching C++ logic)
+	vehicle.AddComponent(packet.ComponentID)
+
+	s.logger.Debug().
+		Int32("vehicleID", packet.VehicleID).
+		Int32("componentID", packet.ComponentID).
+		Str("client", client.GetClientID()).
+		Msg("Vehicle component added")
+
+	// Broadcast to all other clients (reliable packet)
+	// This matches C++ logic: SendPacketToAll with ENET_PACKET_FLAG_RELIABLE
+	packetData, err := packet.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal vehicle component add packet: %w", err)
+	}
+
+	networkPacket := &network.NetworkPacket{
+		ID:   types.VEHICLE_COMPONENT_ADD,
+		Data: packetData,
+		Flag: 1, // Reliable for component updates (matching C++ implementation)
+	}
+
+	if err := s.networkServer.SendPacketToAll(networkPacket, client); err != nil {
+		return fmt.Errorf("failed to broadcast vehicle component add: %w", err)
 	}
 
 	return nil
